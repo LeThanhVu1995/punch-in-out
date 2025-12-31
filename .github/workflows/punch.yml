@@ -9,10 +9,13 @@ on:
 jobs:
   run:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: 20
 
@@ -36,9 +39,20 @@ jobs:
           TARGET_URL: ${{ secrets.TARGET_URL }}
           USERNAME: ${{ secrets.USERNAME }}
           PASSWORD: ${{ secrets.PASSWORD }}
+
           USERNAME_SELECTOR: ${{ secrets.USERNAME_SELECTOR }}
           PASSWORD_SELECTOR: ${{ secrets.PASSWORD_SELECTOR }}
           SUBMIT_SELECTOR: ${{ secrets.SUBMIT_SELECTOR }}
+
           BUTTON_IN_SELECTOR: ${{ secrets.BUTTON_IN_SELECTOR }}
           BUTTON_OUT_SELECTOR: ${{ secrets.BUTTON_OUT_SELECTOR }}
         run: node run.js
+
+      - name: Upload debug artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug
+          path: |
+            *.png
+            debug.html
