@@ -1,0 +1,44 @@
+name: punch-in-out
+
+on:
+  schedule:
+    - cron: "30 1 * * 1-5"   # 08:30 VN (01:30 UTC) Mon-Fri
+    - cron: "0 10 * * 1-5"   # 17:00 VN (10:00 UTC) Mon-Fri
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install deps
+        run: |
+          npm ci || npm i
+          npx playwright install --with-deps
+
+      - name: Decide mode (in/out)
+        run: |
+          if [ "${{ github.event.schedule }}" = "30 1 * * 1-5" ]; then
+            echo "MODE=IN" >> $GITHUB_ENV
+          else
+            echo "MODE=OUT" >> $GITHUB_ENV
+          fi
+
+      - name: Run bot
+        env:
+          MODE: ${{ env.MODE }}
+          LOGIN_URL: ${{ secrets.LOGIN_URL }}
+          TARGET_URL: ${{ secrets.TARGET_URL }}
+          USERNAME: ${{ secrets.USERNAME }}
+          PASSWORD: ${{ secrets.PASSWORD }}
+          USERNAME_SELECTOR: ${{ secrets.USERNAME_SELECTOR }}
+          PASSWORD_SELECTOR: ${{ secrets.PASSWORD_SELECTOR }}
+          SUBMIT_SELECTOR: ${{ secrets.SUBMIT_SELECTOR }}
+          BUTTON_IN_SELECTOR: ${{ secrets.BUTTON_IN_SELECTOR }}
+          BUTTON_OUT_SELECTOR: ${{ secrets.BUTTON_OUT_SELECTOR }}
+        run: node run.js
