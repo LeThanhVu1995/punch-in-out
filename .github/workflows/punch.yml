@@ -2,7 +2,7 @@ name: punch-in-out
 
 on:
   schedule:
-    - cron: "* * * * 1-5"   # test: chạy mỗi phút (UTC)
+    - cron: "*/5 * * * *"   # test: chạy mỗi phút (UTC)
   workflow_dispatch:
 
 jobs:
