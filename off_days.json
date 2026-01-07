@@ -6,8 +6,8 @@
     "taido": ["2026-02-13", "2026-02-23"],
     "vule": ["2026-02-23", "2026-02-24", "2026-02-25"]
   },
-  "startDelayMinSec": 0,
+  "startDelayMinSec": 60,
   "startDelayMaxSec": 180,
-  "betweenUsersMinSec": 0,
+  "betweenUsersMinSec": 60,
   "betweenUsersMaxSec": 120
 }
