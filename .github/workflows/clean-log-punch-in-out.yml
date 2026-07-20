@@ -17,7 +17,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          TARGET_WORKFLOW: punch-in-out.yml
+          TARGET_WORKFLOW: punch.yml
         shell: bash
         run: |
           set -euo pipefail
