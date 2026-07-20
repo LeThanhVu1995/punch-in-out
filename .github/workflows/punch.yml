@@ -49,11 +49,3 @@ jobs:
           BUTTON_OUT_SELECTOR: ${{ secrets.BUTTON_OUT_SELECTOR }}
         run: node run.js
 
-      - name: Upload debug artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug
-          path: |
-            *.png
-            debug.html
