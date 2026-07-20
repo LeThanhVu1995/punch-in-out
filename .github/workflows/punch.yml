@@ -2,10 +2,23 @@ name: punch-in-out
 
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: Punch mode
+        required: true
+        type: choice
+        options:
+          - IN
+          - OUT
+
+concurrency:
+  group: punch-in-out
+  cancel-in-progress: true
 
 jobs:
   run:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -15,23 +28,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
 
-      - name: Install deps
-        run: |
-          npm ci || npm i
-          npx playwright install --with-deps
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Decide mode (in/out)
-        run: |
-          if [ "${{ github.event.schedule }}" = "30 1 * * 1-5" ]; then
-            echo "MODE=IN" >> $GITHUB_ENV
-          else
-            echo "MODE=OUT" >> $GITHUB_ENV
-          fi
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
 
       - name: Run bot
         env:
-          MODE: ${{ env.MODE }}
+          MODE: ${{ inputs.mode }}
+
           LOGIN_URL: ${{ secrets.LOGIN_URL }}
           TARGET_URL: ${{ secrets.TARGET_URL }}
           USERNAME: ${{ secrets.USERNAME }}
@@ -49,7 +57,9 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: debug
+          name: debug-${{ github.run_number }}
           path: |
             *.png
             debug.html
+          if-no-files-found: ignore
+          retention-days: 7
