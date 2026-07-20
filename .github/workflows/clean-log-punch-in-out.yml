@@ -1,0 +1,53 @@
+name: Cleanup Auto Punch Logs
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Delete old Auto Punch runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TARGET_WORKFLOW: punch-in-out.yml
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          success_cutoff=$(date -u -d "7 days ago" +%s)
+          other_cutoff=$(date -u -d "30 days ago" +%s)
+
+          gh api \
+            --paginate \
+            "/repos/${GH_REPO}/actions/workflows/${TARGET_WORKFLOW}/runs?per_page=100" \
+            --jq '.workflow_runs[] |
+              select(.status == "completed") |
+              [.id, .created_at, .conclusion] |
+              @tsv' |
+          while IFS=$'\t' read -r run_id created_at conclusion; do
+            created_epoch=$(date -u -d "${created_at}" +%s)
+            should_delete=false
+
+            if [ "${conclusion}" = "success" ] &&
+               [ "${created_epoch}" -lt "${success_cutoff}" ]; then
+              should_delete=true
+            elif [ "${conclusion}" != "success" ] &&
+                 [ "${created_epoch}" -lt "${other_cutoff}" ]; then
+              should_delete=true
+            fi
+
+            if [ "${should_delete}" = true ]; then
+              echo "Deleting ${run_id}: ${created_at}, ${conclusion}"
+              gh api \
+                --method DELETE \
+                "/repos/${GH_REPO}/actions/runs/${run_id}"
+            fi
+          done
