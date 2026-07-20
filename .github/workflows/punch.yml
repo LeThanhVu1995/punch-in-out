@@ -3,6 +3,10 @@ name: punch-in-out
 on:
   workflow_dispatch:
 
+concurrency:
+  group: punch-in-out
+  cancel-in-progress: true
+
 jobs:
   run:
     runs-on: ubuntu-latest
