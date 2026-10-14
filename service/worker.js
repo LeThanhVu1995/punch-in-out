@@ -3,7 +3,8 @@ const fs = require("fs");
 const path = require("path");
 const {spawn} = require("child_process");
 const {plan} = require("./schedule");
-const root = path.resolve(__dirname, "..");
+const codeRoot = path.resolve(__dirname, "..");
+const root = process.env.PUNCH_ROOT ? path.resolve(process.env.PUNCH_ROOT) : codeRoot;
 const configPath = path.resolve(root, process.env.PUNCH_CONFIG || "config.json");
 const dataDir = path.join(root, "data");
 fs.mkdirSync(dataDir, {recursive:true});
@@ -41,7 +42,7 @@ function runJob(job, config) {
     const output = fs.openSync(path.join(folder,"run.log"), "a");
     const emptyOff = path.join(folder,"off.json");
     fs.writeFileSync(emptyOff, JSON.stringify({timezone:config.timezone,skipWeekends:false}));
-    active = spawn(process.execPath, [path.join(root,"run.js")], {
+    active = spawn(process.execPath, [path.join(codeRoot,"run.js")], {
       cwd:folder, env:{...process.env,...Object.fromEntries(Object.entries(config.environment || {}).filter(([,v])=>v)),
         MODE:job.mode, ACCOUNT_USERNAME:job.username,
         ACCOUNTS_FILE:path.resolve(root,config.accountsFile), OFF_DAYS_FILE:emptyOff},

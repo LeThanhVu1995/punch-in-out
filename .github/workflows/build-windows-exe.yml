@@ -1,0 +1,67 @@
+name: Build Windows EXE
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'packaging/**'
+      - 'scripts/build-exe.ps1'
+      - 'service/**'
+      - 'test/**'
+      - 'run.js'
+      - 'package.json'
+      - 'config.example.json'
+      - '.github/workflows/build-windows-exe.yml'
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build and verify EXE
+        shell: pwsh
+        run: ./scripts/build-exe.ps1
+      - name: Verify service lifecycle (no live punch)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          # A smoke service uses the embedded runtime and a harmless Node timer.
+          $runtime = Get-ChildItem dist/.runtime -Directory | Select-Object -First 1
+          $wrapper = Join-Path $runtime.FullName "wrapper.exe"
+          $node = [System.Security.SecurityElement]::Escape((Join-Path $runtime.FullName "node.exe"))
+          @"
+          <service>
+            <id>PunchInOutBuildSmoke</id><name>Punch Build Smoke</name>
+            <executable>$node</executable>
+            <arguments>-e "setInterval(() => {}, 1000)"</arguments>
+            <log mode="roll"/>
+          </service>
+          "@ | Set-Content (Join-Path $runtime.FullName "wrapper.xml")
+          try {
+            & $wrapper install
+            if ($LASTEXITCODE -ne 0) { throw "Smoke install failed" }
+            & $wrapper start
+            if ($LASTEXITCODE -ne 0) { throw "Smoke start failed" }
+            Start-Sleep -Seconds 3
+            if ((Get-Service PunchInOutBuildSmoke).Status -ne "Running") { throw "Service did not run" }
+            & $wrapper stop
+            if ($LASTEXITCODE -ne 0) { throw "Smoke stop failed" }
+          } finally {
+            & $wrapper uninstall
+            if ($LASTEXITCODE -ne 0) { throw "Smoke uninstall failed" }
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PunchService-windows-x64
+          path: |
+            dist/PunchService.exe
+            dist/PunchService.exe.sha256
+          retention-days: 30

@@ -10,3 +10,10 @@ package-lock.json
 *.png
 debug-*.html
 results.json
+
+build/
+dist/
+.runtime/
+packaging/payload.zip
+packaging/bin/
+packaging/obj/

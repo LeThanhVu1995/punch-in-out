@@ -61,3 +61,43 @@ Do not schedule the old GitHub workflow in parallel with this service.
 - The local PID lock prevents simultaneous workers using this folder. Separate clones/Actions are outside that protection.
 - npm test checks scheduling without contacting the attendance website.
 - Windows installation, VPN access and live attendance must be verified on the actual Windows machine.
+
+## Single EXE (recommended)
+Open GitHub Actions > Build Windows EXE > latest successful run > download
+**PunchService-windows-x64** artifact. Extract PunchService.exe into a permanent writable folder.
+No separate Node.js, WinSW, browser or .NET installation is needed on the target Windows x64 machine.
+
+```powershell
+.\PunchService.exe init
+# Edit config.json, accounts.local.json and off_days.json beside the EXE.
+# Then open an Administrator terminal:
+.\PunchService.exe install
+# Configure service Log On account in services.msc if needed for your preconnected VPN.
+.\PunchService.exe start
+.\PunchService.exe status
+```
+
+Commands: init, install, start, stop, restart, status, uninstall, run (LIVE foreground worker),
+self-test (offline schedule/browser tests), help. Double-click shows help; use a terminal for commands.
+The EXE embeds Node.js, dependencies, Chromium and WinSW. It extracts them to .runtime/
+beside itself once; keep that folder and the EXE in place while installed.
+This is a single distribution EXE, not a service that runs without extracted runtime files.
+The browser makes the EXE large and first launch slower.
+Service install intentionally does not start punching.
+Generated templates contain no real credentials or personal holiday dates.
+Keep config/accounts private and copy existing holidays if needed.
+Restrict write access to the installation folder, configuration and runtime to trusted administrators
+and the intended service account; grant the account access to data/log folders.
+
+For upgrades: stop and uninstall with the OLD EXE, replace it, install and start the NEW EXE.
+Configuration and data/state.json are preserved; never delete state to perform an upgrade.
+Do not install this package alongside the earlier source-based service; both use service ID PunchInOut.
+Unsigned builds may trigger Windows SmartScreen; code signing is not included.
+
+To build locally on Windows x64, install Node.js 22 and .NET SDK 8, then:
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\build-exe.ps1
+```
+The build embeds only an allowlist of code/templates and production dependencies.
+It runs schedule tests and a Chromium smoke test from the final EXE.
+CI also checks WinSW install/start/stop/uninstall with a harmless timer, without submitting attendance.
