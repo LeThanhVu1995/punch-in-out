@@ -9,7 +9,7 @@ concurrency:
 
 jobs:
   run:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     timeout-minutes: 20
 
     steps:
@@ -17,146 +17,155 @@ jobs:
         uses: actions/checkout@v4
 
       # =========================================================
-      # VPN
+      # CREATE VPN PROFILE
       # =========================================================
-
-      - name: Install PPTP VPN client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y pptp-linux ppp
-
-      - name: Configure PPTP VPN
-        shell: bash
+      - name: Create VPN profile
+        shell: powershell
         env:
           VPN_SERVER: ${{ secrets.VPN_SERVER }}
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          Write-Host "Creating VPN profile..."
+
+          $existingVpn = Get-VpnConnection -Name "CLV" -ErrorAction SilentlyContinue
+
+          if ($existingVpn) {
+            Write-Host "VPN profile already exists. Removing..."
+            Remove-VpnConnection -Name "CLV" -Force
+          }
+
+          Add-VpnConnection `
+            -Name "CLV" `
+            -ServerAddress "$env:VPN_SERVER" `
+            -TunnelType Pptp `
+            -AuthenticationMethod MSChapv2 `
+            -EncryptionLevel Required `
+            -RememberCredential `
+            -Force
+
+          Write-Host "VPN profile created."
+
+          Get-VpnConnection -Name "CLV"
+
+      # =========================================================
+      # CONNECT VPN
+      # =========================================================
+      - name: Connect VPN
+        shell: powershell
+        env:
           VPN_USER: ${{ secrets.VPN_USER }}
           VPN_PASSWORD: ${{ secrets.VPN_PASSWORD }}
         run: |
-          set -euo pipefail
+          $ErrorActionPreference = "Stop"
 
-          echo "Creating PPTP configuration..."
+          Write-Host "Connecting to CLV VPN..."
 
-          sudo tee /etc/ppp/peers/clv > /dev/null <<EOF
-          pty "pptp ${VPN_SERVER} --nolaunchpppd"
-          name "${VPN_USER}"
-          remotename PPTP
-          require-mppe-128
-          file /etc/ppp/options.pptp
-          ipparam CLV
-          persist
-          maxfail 1
-          holdoff 5
-          EOF
+          $result = rasdial "CLV" "$env:VPN_USER" "$env:VPN_PASSWORD"
 
-          # Remove old CLV credentials if any
-          sudo sed -i '/PPTP/d' /etc/ppp/chap-secrets
+          Write-Host $result
 
-          # Add VPN username/password
-          printf '%s\t%s\t%s\t%s\n' \
-            "$VPN_USER" \
-            "PPTP" \
-            "$VPN_PASSWORD" \
-            "*" \
-            | sudo tee -a /etc/ppp/chap-secrets > /dev/null
+          Start-Sleep -Seconds 10
 
-          sudo chmod 600 /etc/ppp/chap-secrets
+          Write-Host ""
+          Write-Host "===== VPN STATUS ====="
 
-      - name: Connect PPTP VPN
-        shell: bash
-        run: |
-          set -euo pipefail
+          $vpn = Get-VpnConnection -Name "CLV"
 
-          echo "Connecting VPN..."
+          Write-Host "Connection Status: $($vpn.ConnectionStatus)"
 
-          sudo pon clv
-
-          echo "Waiting for VPN interface..."
-
-          CONNECTED=false
-
-          for i in {1..30}; do
-            if ip link show ppp0 > /dev/null 2>&1; then
-              CONNECTED=true
-              break
-            fi
-
-            echo "Waiting... $i/30"
-            sleep 2
-          done
-
-          if [ "$CONNECTED" != "true" ]; then
-            echo "VPN connection failed"
-            echo "===== PPP LOG ====="
-            sudo tail -100 /var/log/syslog 2>/dev/null || true
+          if ($vpn.ConnectionStatus -ne "Connected") {
+            Write-Host "VPN connection failed."
             exit 1
-          fi
+          }
 
-          echo "VPN CONNECTED"
-          echo "======================"
-          ip addr show ppp0
-          echo "======================"
-          ip route
+          Write-Host ""
+          Write-Host "===== IPCONFIG ====="
+          ipconfig
 
-      - name: Test VPN connection
-        shell: bash
+          Write-Host ""
+          Write-Host "===== ROUTES ====="
+          route print
+
+      # =========================================================
+      # TEST TARGET
+      # =========================================================
+      - name: Test target through VPN
+        shell: powershell
         env:
           TARGET_URL: ${{ secrets.TARGET_URL }}
         run: |
-          set -euo pipefail
+          $ErrorActionPreference = "Stop"
 
-          echo "VPN interface:"
-          ip addr show ppp0
+          Write-Host "Testing TARGET_URL through VPN..."
+          Write-Host "URL: $env:TARGET_URL"
 
-          echo ""
-          echo "Current routes:"
-          ip route
+          try {
+            $uri = [System.Uri]$env:TARGET_URL
 
-          echo ""
-          echo "Testing target..."
+            Write-Host ""
+            Write-Host "===== DNS ====="
 
-          curl \
-            --connect-timeout 15 \
-            --max-time 30 \
-            -k \
-            -I \
-            "$TARGET_URL" || {
-              echo "Cannot reach TARGET_URL through VPN"
-              exit 1
+            Resolve-DnsName $uri.Host -ErrorAction Continue
+
+            Write-Host ""
+            Write-Host "===== CONNECTION TEST ====="
+
+            $test = Test-NetConnection `
+              -ComputerName $uri.Host `
+              -Port 443
+
+            Write-Host "RemoteAddress: $($test.RemoteAddress)"
+            Write-Host "TcpTestSucceeded: $($test.TcpTestSucceeded)"
+
+            if (-not $test.TcpTestSucceeded) {
+              throw "Cannot connect to $($uri.Host):443"
             }
 
-      # =========================================================
-      # NODE / PLAYWRIGHT
-      # =========================================================
+            Write-Host ""
+            Write-Host "TARGET_URL is reachable through VPN."
+          }
+          catch {
+            Write-Host ""
+            Write-Host "Cannot reach TARGET_URL through VPN."
+            Write-Host $_
+            exit 1
+          }
 
+      # =========================================================
+      # NODE
+      # =========================================================
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
+      # =========================================================
+      # INSTALL DEPENDENCIES
+      # =========================================================
       - name: Install deps
+        shell: powershell
         run: |
-          npm ci || npm i
-          npx playwright install --with-deps chromium
+          npm ci
+
+          npx playwright install chromium
 
       # =========================================================
-      # MODE
+      # DECIDE MODE
       # =========================================================
-
-      - name: Decide mode (in/out)
-        shell: bash
+      - name: Decide mode
+        shell: powershell
         run: |
-          if [ "${{ github.event.schedule }}" = "30 1 * * 1-5" ]; then
-            echo "MODE=IN" >> "$GITHUB_ENV"
-          else
-            echo "MODE=OUT" >> "$GITHUB_ENV"
-          fi
+          echo "MODE=OUT" >> $env:GITHUB_ENV
+
+          Write-Host "MODE=OUT"
 
       # =========================================================
       # RUN BOT
       # =========================================================
-
       - name: Run bot
+        shell: powershell
         env:
           MODE: ${{ env.MODE }}
 
@@ -173,24 +182,42 @@ jobs:
           BUTTON_IN_SELECTOR: ${{ secrets.BUTTON_IN_SELECTOR }}
           BUTTON_OUT_SELECTOR: ${{ secrets.BUTTON_OUT_SELECTOR }}
         run: |
+          Write-Host "Running bot..."
+          Write-Host "Mode: $env:MODE"
+
           node run.js
 
       # =========================================================
-      # ALWAYS DISCONNECT
+      # UPLOAD DEBUG
       # =========================================================
+      - name: Upload debug artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-${{ github.run_number }}
+          path: |
+            *.png
+            debug.html
+          if-no-files-found: ignore
+          retention-days: 7
 
+      # =========================================================
+      # DISCONNECT VPN
+      # =========================================================
       - name: Disconnect VPN
         if: always()
-        shell: bash
+        shell: powershell
         run: |
-          echo "Disconnecting VPN..."
+          Write-Host "Disconnecting CLV VPN..."
 
-          sudo poff clv || true
+          rasdial "CLV" /disconnect
 
-          sleep 2
+          Start-Sleep -Seconds 2
 
-          if ip link show ppp0 > /dev/null 2>&1; then
-            echo "Warning: ppp0 still exists"
-          else
-            echo "VPN disconnected successfully"
-          fi
+          $vpn = Get-VpnConnection -Name "CLV" -ErrorAction SilentlyContinue
+
+          if ($vpn) {
+            Write-Host "Final VPN status: $($vpn.ConnectionStatus)"
+          }
+
+          Write-Host "VPN cleanup completed."
