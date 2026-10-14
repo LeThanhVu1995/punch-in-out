@@ -105,7 +105,7 @@ function clampDelayCfg(cfg) {
   }
 
   const max = Math.min(parseInt(LIMIT, 10) || accounts.length, accounts.length);
-  const targets = accounts.slice(0, max);
+  const targets = accounts.slice(0, max).filter(acc => !process.env.ACCOUNT_USERNAME || acc.username === process.env.ACCOUNT_USERNAME);
 
   /**
    * off_days.json format:
@@ -253,6 +253,7 @@ function clampDelayCfg(cfg) {
     }
 
     fs.writeFileSync("results.json", JSON.stringify(results, null, 2), "utf-8");
+    if (results.some(result => !result.ok)) process.exitCode = 1;
     console.log("Saved results.json");
   } finally {
     await browser.close();

@@ -4,5 +4,12 @@
   "type": "commonjs",
   "dependencies": {
     "playwright": "^1.50.0"
+  },
+  "scripts": {
+    "start": "node service/worker.js",
+    "test": "node --test test/schedule.test.js"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

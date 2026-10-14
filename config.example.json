@@ -1,0 +1,33 @@
+{
+  "timezone": "Asia/Ho_Chi_Minh",
+  "weekdays": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "windows": {
+    "IN": {
+      "from": "07:20",
+      "to": "08:30"
+    },
+    "OUT": {
+      "from": "17:40",
+      "to": "18:35"
+    }
+  },
+  "accountsFile": "accounts.local.json",
+  "offDaysFile": "off_days.json",
+  "pollSeconds": 15,
+  "jobTimeoutSeconds": 300,
+  "environment": {
+    "LOGIN_URL": "",
+    "TARGET_URL": "",
+    "USERNAME_SELECTOR": "",
+    "PASSWORD_SELECTOR": "",
+    "SUBMIT_SELECTOR": "",
+    "BUTTON_IN_SELECTOR": "",
+    "BUTTON_OUT_SELECTOR": ""
+  }
+}
