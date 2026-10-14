@@ -10,34 +10,159 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # =========================================================
+      # VPN
+      # =========================================================
+
+      - name: Install PPTP VPN client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pptp-linux ppp
+
+      - name: Configure PPTP VPN
+        shell: bash
+        env:
+          VPN_SERVER: ${{ secrets.VPN_SERVER }}
+          VPN_USER: ${{ secrets.VPN_USER }}
+          VPN_PASSWORD: ${{ secrets.VPN_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          echo "Creating PPTP configuration..."
+
+          sudo tee /etc/ppp/peers/clv > /dev/null <<EOF
+          pty "pptp ${VPN_SERVER} --nolaunchpppd"
+          name "${VPN_USER}"
+          remotename PPTP
+          require-mppe-128
+          file /etc/ppp/options.pptp
+          ipparam CLV
+          persist
+          maxfail 1
+          holdoff 5
+          EOF
+
+          # Remove old CLV credentials if any
+          sudo sed -i '/PPTP/d' /etc/ppp/chap-secrets
+
+          # Add VPN username/password
+          printf '%s\t%s\t%s\t%s\n' \
+            "$VPN_USER" \
+            "PPTP" \
+            "$VPN_PASSWORD" \
+            "*" \
+            | sudo tee -a /etc/ppp/chap-secrets > /dev/null
+
+          sudo chmod 600 /etc/ppp/chap-secrets
+
+      - name: Connect PPTP VPN
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Connecting VPN..."
+
+          sudo pon clv
+
+          echo "Waiting for VPN interface..."
+
+          CONNECTED=false
+
+          for i in {1..30}; do
+            if ip link show ppp0 > /dev/null 2>&1; then
+              CONNECTED=true
+              break
+            fi
+
+            echo "Waiting... $i/30"
+            sleep 2
+          done
+
+          if [ "$CONNECTED" != "true" ]; then
+            echo "VPN connection failed"
+            echo "===== PPP LOG ====="
+            sudo tail -100 /var/log/syslog 2>/dev/null || true
+            exit 1
+          fi
+
+          echo "VPN CONNECTED"
+          echo "======================"
+          ip addr show ppp0
+          echo "======================"
+          ip route
+
+      - name: Test VPN connection
+        shell: bash
+        env:
+          TARGET_URL: ${{ secrets.TARGET_URL }}
+        run: |
+          set -euo pipefail
+
+          echo "VPN interface:"
+          ip addr show ppp0
+
+          echo ""
+          echo "Current routes:"
+          ip route
+
+          echo ""
+          echo "Testing target..."
+
+          curl \
+            --connect-timeout 15 \
+            --max-time 30 \
+            -k \
+            -I \
+            "$TARGET_URL" || {
+              echo "Cannot reach TARGET_URL through VPN"
+              exit 1
+            }
+
+      # =========================================================
+      # NODE / PLAYWRIGHT
+      # =========================================================
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
 
       - name: Install deps
         run: |
           npm ci || npm i
-          npx playwright install --with-deps
+          npx playwright install --with-deps chromium
+
+      # =========================================================
+      # MODE
+      # =========================================================
 
       - name: Decide mode (in/out)
+        shell: bash
         run: |
           if [ "${{ github.event.schedule }}" = "30 1 * * 1-5" ]; then
-            echo "MODE=IN" >> $GITHUB_ENV
+            echo "MODE=IN" >> "$GITHUB_ENV"
           else
-            echo "MODE=OUT" >> $GITHUB_ENV
+            echo "MODE=OUT" >> "$GITHUB_ENV"
           fi
+
+      # =========================================================
+      # RUN BOT
+      # =========================================================
 
       - name: Run bot
         env:
           MODE: ${{ env.MODE }}
+
           LOGIN_URL: ${{ secrets.LOGIN_URL }}
           TARGET_URL: ${{ secrets.TARGET_URL }}
+
           USERNAME: ${{ secrets.USERNAME }}
           PASSWORD: ${{ secrets.PASSWORD }}
 
@@ -47,5 +172,25 @@ jobs:
 
           BUTTON_IN_SELECTOR: ${{ secrets.BUTTON_IN_SELECTOR }}
           BUTTON_OUT_SELECTOR: ${{ secrets.BUTTON_OUT_SELECTOR }}
-        run: node run.js
+        run: |
+          node run.js
 
+      # =========================================================
+      # ALWAYS DISCONNECT
+      # =========================================================
+
+      - name: Disconnect VPN
+        if: always()
+        shell: bash
+        run: |
+          echo "Disconnecting VPN..."
+
+          sudo poff clv || true
+
+          sleep 2
+
+          if ip link show ppp0 > /dev/null 2>&1; then
+            echo "Warning: ppp0 still exists"
+          else
+            echo "VPN disconnected successfully"
+          fi
