@@ -119,3 +119,26 @@ existing unknown jobs from older builds are not automatically replayed.
 Evidence is saved under data/runs/<date>/<hex-user>-<mode>/attempt-N/.
 Download the new EXE, stop/uninstall using the old EXE, replace it and install/start.
 Keep config.json, accounts.local.json, off_days.json and data/state.json.
+
+## Local dashboard
+After starting the service, open http://127.0.0.1:17840 on that Windows machine.
+It shows today's account IN/OUT schedules (formatted times), statuses, attempt counts, retry times
+and the latest attempt log. It refreshes every 3 seconds. Passwords/configuration are never returned;
+password strings are redacted from displayed logs.
+Choose IN or OUT before using **Active / Run all now**, **Retry failed**, or an account's Run now button.
+Manual commands apply to today only, override that day's hours/holidays, and queue accounts serially.
+A running account is skipped. Repeating clicked or unknown accounts requires explicit confirmation
+because the site uses a shared Punch In/Out button. Check attendance before confirming.
+Manual requests are persisted and duplicate request IDs are ignored. A new explicit manual run
+starts a new retry budget; total attempt numbers and all previous logs are retained.
+The dashboard listens only on 127.0.0.1 and checks Host/Origin plus a session token for actions.
+It has no remote-network access or user login: other users on this same Windows machine may access it.
+Dashboard actions are recorded in data/manual-actions.jsonl without passwords.
+Default for existing configs is enabled on port 17840. Optionally configure:
+```json
+"dashboard": { "enabled": true, "port": 17840 }
+```
+Restart the service after changing the port/enabled flag. If the port is already used, choose another
+port or disable the dashboard before restarting.
+A Windows service does not open a browser window in the user's desktop session; open the local URL
+yourself. Closing the browser does not stop the service.

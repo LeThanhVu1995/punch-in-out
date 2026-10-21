@@ -22,7 +22,7 @@ function complete(job, progress, config, now = new Date()) {
   job.finishedAt = now.toISOString();
   delete job.nextRetryAt;
   if (result === "retryable") {
-    if (job.attempts < 1 + maxRetries) {
+    if ((job.attemptsInCycle ?? job.attempts) < 1 + maxRetries) {
       job.status = "pending";
       job.nextRetryAt = new Date(now.getTime() + retryDelaySeconds * 1000).toISOString();
     } else job.status = "failed";

@@ -230,6 +230,8 @@ function clampDelayCfg(cfg) {
         await page.goto(TARGET_URL, { waitUntil: "networkidle" });
         await page.screenshot({ path: `04-target-${MODE}-${userTag}.png`, fullPage: true });
 
+        // Resolve visibility/actionability before committing to a potentially non-idempotent click.
+        await page.locator(buttonSelector).click({ trial: true });
         progress("click_started");
         await page.click(buttonSelector);
         progress("clicked");

@@ -46,7 +46,7 @@ test("worker retries failing account independently, persists evidence and recove
   const {spawn}=require("node:child_process");
   const folder=fs.mkdtempSync(path.join(os.tmpdir(),"punch-retry-"));
   fs.mkdirSync(path.join(folder,"service"));
-  for(const name of ["worker.js","schedule.js","retry.js"])
+  for(const name of ["worker.js","schedule.js","retry.js","manual.js","dashboard.js"])
     fs.copyFileSync(path.join(__dirname,"../service",name),path.join(folder,"service",name));
   // Stub the browser runner: this test cannot contact the attendance website.
   fs.writeFileSync(path.join(folder,"run.js"), [
@@ -56,7 +56,7 @@ test("worker retries failing account independently, persists evidence and recove
     'process.exit(process.env.ACCOUNT_USERNAME==="good"?0:1);'
   ].join("\n"));
   const now=new Date(), date=now.toISOString().slice(0,10);
-  const config={timezone:"UTC",weekdays:[0,1,2,3,4,5,6],
+  const config={dashboard:{enabled:false},timezone:"UTC",weekdays:[0,1,2,3,4,5,6],
     windows:{IN:{from:"00:00",to:"23:59"},OUT:{from:"00:00",to:"23:59"}},
     accountsFile:"accounts.json",offDaysFile:"off.json",pollSeconds:1,jobTimeoutSeconds:5,retryDelaySeconds:1,
     environment:Object.fromEntries(["LOGIN_URL","TARGET_URL","USERNAME_SELECTOR","PASSWORD_SELECTOR","SUBMIT_SELECTOR","BUTTON_IN_SELECTOR","BUTTON_OUT_SELECTOR"].map(k=>[k,"unused"]))};

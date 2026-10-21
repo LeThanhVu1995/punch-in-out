@@ -31,5 +31,9 @@
     "BUTTON_OUT_SELECTOR": ""
   },
   "maxRetries": 3,
-  "retryDelaySeconds": 60
+  "retryDelaySeconds": 60,
+  "dashboard": {
+    "enabled": true,
+    "port": 17840
+  }
 }

@@ -38,7 +38,7 @@ function plan(config, off, accounts, state, now = new Date()) {
       if (!state[key]) state[key] = { date: local.date, username: acc.username, mode,
         due: crypto.randomInt(from, to + 1), status: "pending" };
       const job = state[key];
-      if (job.status !== "pending") continue;
+      if (job.manualRequestedAt || job.status !== "pending") continue;
       if (local.seconds > to) { job.status = "missed"; continue; }
       if (job.nextRetryAt && now.getTime() < new Date(job.nextRetryAt).getTime()) continue;
       if (local.seconds >= job.due) jobs.push({key, job});

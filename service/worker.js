@@ -2,7 +2,8 @@
 const fs = require("fs");
 const path = require("path");
 const {spawn} = require("child_process");
-const {plan} = require("./schedule");
+const {dueJobs} = require("./manual");
+const {startDashboard} = require("./dashboard");
 const {retryConfig, readProgress, complete} = require("./retry");
 const codeRoot = path.resolve(__dirname, "..");
 const root = process.env.PUNCH_ROOT ? path.resolve(process.env.PUNCH_ROOT) : codeRoot;
@@ -30,7 +31,17 @@ function save() {
   fs.writeFileSync(stateFile + ".tmp", JSON.stringify(state,null,2));
   fs.renameSync(stateFile + ".tmp", stateFile);
 }
-let stopping = false, active;
+let stopping = false, active, dashboard, wakeResolve, wakeRequested = false;
+function wake() { wakeRequested = true; if(wakeResolve)wakeResolve(); }
+async function pause(seconds) {
+  if(wakeRequested){wakeRequested=false;return;}
+  await new Promise(resolve=>{
+    const timer=setTimeout(done,seconds*1000);
+    function done(){clearTimeout(timer);wakeResolve=undefined;resolve();}
+    wakeResolve=done;
+  });
+  wakeRequested=false;
+}
 // Legacy unknown jobs have no reliable click phase and remain untouched.
 const initialConfig = read(configPath);
 retryConfig(initialConfig);
@@ -39,7 +50,7 @@ for (const job of Object.values(state)) if (job.status === "running") {
   complete(job, progress, initialConfig);
 }
 save();
-function stop() { stopping = true; if (active) active.kill(); }
+function stop() { stopping = true; wake(); if (active) active.kill(); }
 process.on("SIGTERM", stop); process.on("SIGINT", stop);
 function runJob(job, config) {
   return new Promise(resolve => {
@@ -71,29 +82,36 @@ function runJob(job, config) {
     });
   });
 }
+function settings() {
+  const config = read(configPath);
+  for (const key of ["LOGIN_URL","TARGET_URL","USERNAME_SELECTOR","PASSWORD_SELECTOR",
+    "SUBMIT_SELECTOR","BUTTON_IN_SELECTOR","BUTTON_OUT_SELECTOR"])
+    if (!(config.environment?.[key] || process.env[key])) throw new Error("Missing config environment: "+key);
+  if (!Number.isFinite(config.pollSeconds) || config.pollSeconds < 1 ||
+      !Number.isFinite(config.jobTimeoutSeconds) || config.jobTimeoutSeconds < 1)
+    throw new Error("pollSeconds and jobTimeoutSeconds must be positive");
+  retryConfig(config);
+  const accounts = read(path.resolve(root,config.accountsFile));
+  if (!Array.isArray(accounts) || !accounts.length ||
+      new Set(accounts.map(a=>a.username)).size !== accounts.length) throw new Error("Invalid or duplicate accounts");
+  const off = read(path.resolve(root,config.offDaysFile));
+  return {config,accounts,off};
+}
+
 (async () => {
   try {
     console.log("Punch service started. VPN is managed externally.");
+    dashboard=await startDashboard({root,state,save,settings,stopping:()=>stopping,wake});
     while (!stopping) {
-      const config = read(configPath);
-      for (const key of ["LOGIN_URL","TARGET_URL","USERNAME_SELECTOR","PASSWORD_SELECTOR",
-        "SUBMIT_SELECTOR","BUTTON_IN_SELECTOR","BUTTON_OUT_SELECTOR"])
-        if (!(config.environment?.[key] || process.env[key])) throw new Error("Missing config environment: "+key);
-      if (!Number.isFinite(config.pollSeconds) || config.pollSeconds < 1 ||
-          !Number.isFinite(config.jobTimeoutSeconds) || config.jobTimeoutSeconds < 1)
-        throw new Error("pollSeconds and jobTimeoutSeconds must be positive");
-      retryConfig(config);
-      const accounts = read(path.resolve(root,config.accountsFile));
-      if (!Array.isArray(accounts) || !accounts.length ||
-          new Set(accounts.map(a=>a.username)).size !== accounts.length) throw new Error("Invalid or duplicate accounts");
-      const off = read(path.resolve(root,config.offDaysFile));
-      const {jobs} = plan(config,off,accounts,state);
+      const {config,accounts,off} = settings();
+      const jobs = dueJobs(config,off,accounts,state);
       save();
       for (const {job} of jobs) {
         if (stopping) break;
         // Recheck the window and calendar after waiting for another account.
-        const eligible = plan(config,off,accounts,state).jobs.some(item=>item.job===job);
+        const eligible = dueJobs(config,off,accounts,state).some(item=>item.job===job);
         if (!eligible) {save();continue;}
+        job.attemptsInCycle = (job.attemptsInCycle ?? job.attempts ?? 0) + 1;
         job.attempts = (job.attempts || 0) + 1;
         job.status="running"; job.startedAt=new Date().toISOString(); save();
         const progress = await runJob(job,config);
@@ -101,7 +119,10 @@ function runJob(job, config) {
         save();
         console.log(job.date,job.mode,job.username,job.status);
       }
-      await new Promise(resolve=>setTimeout(resolve,config.pollSeconds*1000));
+      await pause(config.pollSeconds);
     }
-  } finally { fs.unlinkSync(lock); }
+  } finally {
+    if(dashboard){dashboard.closeAllConnections();await new Promise(resolve=>dashboard.close(resolve));}
+    fs.unlinkSync(lock);
+  }
 })().catch(error=>{console.error(error.message);process.exitCode=1;});

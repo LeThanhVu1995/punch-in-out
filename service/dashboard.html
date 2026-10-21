@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Punch Control</title>
+<style>
+:root{font-family:Segoe UI,system-ui,sans-serif;color:#183044;background:#f2f5f9;font-size:14px}
+*{box-sizing:border-box}body{margin:0}main{max-width:1400px;margin:auto;padding:32px}
+header{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:28px}
+h1{font-size:28px;letter-spacing:-1px;margin:4px 0}p{color:#64778a;line-height:1.6;margin:5px 0}
+.eyebrow{color:#188c82;font-size:11px;font-weight:700;letter-spacing:2px}
+.live{padding:9px 13px;border-radius:30px;background:#dff6ec;color:#127c55;font-weight:600}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.card{background:white;padding:20px;border:1px solid #e3e9ef;border-radius:14px}.number{font-size:28px;font-weight:650;margin-top:8px}
+.panel{background:#fff;border:1px solid #e3e9ef;border-radius:14px;overflow:hidden}
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:18px;border-bottom:1px solid #e5eaf0}
+button,select,input{font:inherit;border:1px solid #d8e1e9;border-radius:7px;padding:9px 12px;background:#fff;color:#183044}
+button{cursor:pointer;font-weight:600}button:hover{background:#edf4f9}button.primary{background:#167e77;color:white;border-color:#167e77}
+button:disabled{opacity:.5;cursor:wait}.spacer{flex:1}.scroll{overflow:auto}
+table{width:100%;border-collapse:collapse;white-space:nowrap}
+th{background:#f8fafc;color:#63768b;font-size:11px;letter-spacing:.6px;text-transform:uppercase;text-align:left;padding:14px 18px}
+td{padding:14px 18px;border-top:1px solid #edf1f5;font-variant-numeric:tabular-nums}
+.badge{display:inline-block;font-size:12px;padding:5px 8px;border-radius:6px;background:#eef2f6;color:#52677c}
+.clicked{background:#e2f5ec;color:#177345}.failed,.unknown{background:#feeae6;color:#ae4435}
+.running{background:#e1efff;color:#286ca9}.pending{background:#fff4d9;color:#956e1d}
+.missed{background:#f0eafa;color:#76529c}.small{font-size:12px;color:#76879a}
+.notice{margin:16px 0;padding:14px 18px;background:#eaf2f8;border-radius:10px;color:#4a6379;line-height:1.6}
+#message{min-height:24px;color:#167e77;margin:12px 0}footer{display:flex;justify-content:space-between;margin-top:16px}
+dialog{border:1px solid #dce4ed;border-radius:12px;max-width:900px;width:90vw;padding:24px}
+dialog::backdrop{background:#102b4560}pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:60vh;overflow:auto;background:#112b40;color:#dbe9f3;padding:16px;border-radius:8px}
+@media(max-width:720px){main{padding:16px}.cards{grid-template-columns:repeat(2,1fr)}header{align-items:flex-start}.toolbar{gap:8px}th,td{padding:12px}}
+</style></head><body><main>
+<header><div><div class="eyebrow">LOCAL SERVICE CONSOLE</div><h1>Punch Control</h1><p id="subtitle">Đang kết nối service…</p></div><span class="live" id="connection">Connecting</span></header>
+<section class="cards">
+<div class="card"><span>Tài khoản</span><div class="number" id="users">—</div></div>
+<div class="card"><span>Đã bấm · lượt đang xem</span><div class="number" id="clicked">—</div></div>
+<div class="card"><span>Lỗi / cần kiểm tra</span><div class="number" id="errors">—</div></div>
+<div class="card"><span>Đang chờ / đang chạy</span><div class="number" id="waiting">—</div></div>
+</section>
+<div class="panel"><div class="toolbar">
+<select id="mode" aria-label="Lượt chấm công"><option value="IN">Buổi sáng · IN</option><option value="OUT">Buổi chiều · OUT</option></select>
+<input id="search" placeholder="Tìm tài khoản…" aria-label="Tìm tài khoản">
+<select id="filter" aria-label="Lọc trạng thái"><option value="all">Tất cả trạng thái</option><option value="errors">Lỗi / quá giờ</option><option value="pending">Đang chờ</option><option value="clicked">Đã bấm</option></select>
+<div class="spacer"></div><button id="refresh">Làm mới</button><button id="failed">Chạy lại lượt lỗi</button><button class="primary" id="activate">Active · Chạy tất cả ngay</button>
+</div><div class="scroll"><table><thead><tr><th>Tài khoản</th><th>Giờ hẹn</th><th>Trạng thái</th><th>Lần thử</th><th>Bắt đầu / kết thúc</th><th>Thao tác</th></tr></thead><tbody id="rows"></tbody></table></div></div>
+<div id="message" role="status"></div>
+<div class="notice">Chạy ngay áp dụng cho lượt IN hoặc OUT đang chọn, bỏ qua khung giờ và ngày nghỉ hôm nay. Lượt đang chạy không bị xếp lại. “Đã bấm” chưa xác nhận website đã ghi nhận; kiểm tra chấm công trước khi lặp lại lượt đã bấm hoặc chưa rõ kết quả.</div>
+<footer class="small"><span id="policy">Tự cập nhật mỗi 3 giây</span><span id="updated">—</span></footer>
+<dialog id="logs"><h3 id="logtitle">Log</h3><pre id="logtext"></pre><button id="closeLogs">Đóng</button></dialog>
+</main><script src="/dashboard.js"></script></body></html>
