@@ -55,7 +55,7 @@ internal static class Program
             var wrapper = Path.Combine(runtime, "wrapper.exe");
             if (command == "self-test")
             {
-                var result = Run(node, runtime, "--test", "test/schedule.test.js");
+                var result = Run(node, runtime, "--test", "test/schedule.test.js", "test/retry.test.js");
                 if (result != 0) return result;
                 return Run(node, runtime, "packaging/smoke.cjs");
             }

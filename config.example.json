@@ -29,5 +29,7 @@
     "SUBMIT_SELECTOR": "",
     "BUTTON_IN_SELECTOR": "",
     "BUTTON_OUT_SELECTOR": ""
-  }
+  },
+  "maxRetries": 3,
+  "retryDelaySeconds": 60
 }

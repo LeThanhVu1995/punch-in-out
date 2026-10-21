@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const {spawn} = require("child_process");
 const {plan} = require("./schedule");
+const {retryConfig, readProgress, complete} = require("./retry");
 const codeRoot = path.resolve(__dirname, "..");
 const root = process.env.PUNCH_ROOT ? path.resolve(process.env.PUNCH_ROOT) : codeRoot;
 const configPath = path.resolve(root, process.env.PUNCH_CONFIG || "config.json");
@@ -30,21 +31,32 @@ function save() {
   fs.renameSync(stateFile + ".tmp", stateFile);
 }
 let stopping = false, active;
-for (const job of Object.values(state)) if (job.status === "running") job.status = "unknown";
+// Legacy unknown jobs have no reliable click phase and remain untouched.
+const initialConfig = read(configPath);
+retryConfig(initialConfig);
+for (const job of Object.values(state)) if (job.status === "running") {
+  const progress = job.progressFile ? readProgress(path.resolve(root,job.progressFile)) : {};
+  complete(job, progress, initialConfig);
+}
 save();
 function stop() { stopping = true; if (active) active.kill(); }
 process.on("SIGTERM", stop); process.on("SIGINT", stop);
 function runJob(job, config) {
   return new Promise(resolve => {
     const folder = path.join(dataDir,"runs",job.date,
-      Buffer.from(job.username).toString("hex") + "-" + job.mode);
+      Buffer.from(job.username).toString("hex") + "-" + job.mode, "attempt-" + job.attempts);
     fs.mkdirSync(folder,{recursive:true});
+    const progressFile = path.join(folder,"progress.json");
+    job.progressFile = path.relative(root,progressFile);
+    // Persist attempt and phase before launching; each attempt has its own evidence.
+    fs.writeFileSync(progressFile, JSON.stringify({phase:"before_click"}));
+    save();
     const output = fs.openSync(path.join(folder,"run.log"), "a");
     const emptyOff = path.join(folder,"off.json");
     fs.writeFileSync(emptyOff, JSON.stringify({timezone:config.timezone,skipWeekends:false}));
     active = spawn(process.execPath, [path.join(codeRoot,"run.js")], {
       cwd:folder, env:{...process.env,...Object.fromEntries(Object.entries(config.environment || {}).filter(([,v])=>v)),
-        MODE:job.mode, ACCOUNT_USERNAME:job.username,
+        MODE:job.mode, ACCOUNT_USERNAME:job.username, ATTEMPT_PROGRESS_FILE:progressFile,
         ACCOUNTS_FILE:path.resolve(root,config.accountsFile), OFF_DAYS_FILE:emptyOff},
       stdio:["ignore",output,output]
     });
@@ -53,8 +65,9 @@ function runJob(job, config) {
     active.once("error", error => console.error("Child process failed:",error.message));
     active.once("close", code => {
       clearTimeout(timer); fs.closeSync(output); active=undefined;
-      // A click is not proof of server acceptance. Never automatically retry an ambiguous attempt.
-      resolve(code === 0 && !timedOut && !stopping ? "clicked" : "unknown");
+      job.lastExitCode = code;
+      job.timedOut = timedOut;
+      resolve(readProgress(progressFile));
     });
   });
 }
@@ -69,6 +82,7 @@ function runJob(job, config) {
       if (!Number.isFinite(config.pollSeconds) || config.pollSeconds < 1 ||
           !Number.isFinite(config.jobTimeoutSeconds) || config.jobTimeoutSeconds < 1)
         throw new Error("pollSeconds and jobTimeoutSeconds must be positive");
+      retryConfig(config);
       const accounts = read(path.resolve(root,config.accountsFile));
       if (!Array.isArray(accounts) || !accounts.length ||
           new Set(accounts.map(a=>a.username)).size !== accounts.length) throw new Error("Invalid or duplicate accounts");
@@ -80,9 +94,11 @@ function runJob(job, config) {
         // Recheck the window and calendar after waiting for another account.
         const eligible = plan(config,off,accounts,state).jobs.some(item=>item.job===job);
         if (!eligible) {save();continue;}
+        job.attempts = (job.attempts || 0) + 1;
         job.status="running"; job.startedAt=new Date().toISOString(); save();
-        job.status=await runJob(job,config);
-        job.finishedAt=new Date().toISOString(); save();
+        const progress = await runJob(job,config);
+        complete(job,progress,config);
+        save();
         console.log(job.date,job.mode,job.username,job.status);
       }
       await new Promise(resolve=>setTimeout(resolve,config.pollSeconds*1000));

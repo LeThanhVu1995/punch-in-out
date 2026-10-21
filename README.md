@@ -56,10 +56,11 @@ Do not schedule the old GitHub workflow in parallel with this service.
 - data/runs/YYYY-MM-DD/<hex-username>-IN or OUT contains run.log, results.json, screenshots and debug HTML.
 - logs/ contains wrapper/stdout/stderr logs. Periodically remove old run folders as needed.
 - clicked means Playwright clicked the button, **not verified server acceptance**.
-- running becomes unknown on restart. Failures/timeouts also become unknown; no automatic retry because the server may already have accepted the click.
+- Failures before the punch click are retried up to 3 times (4 attempts total), 60 seconds apart. A persisted pre-click running attempt is recovered after restart with the same attempt budget.
+- Once a punch click starts, failures remain unknown; no automatic repeat because the server may already have accepted the click. Legacy unknown jobs remain unchanged.
 - Inspect the website attendance record before any manual retry. Do not delete the state file merely to restart the service.
 - The local PID lock prevents simultaneous workers using this folder. Separate clones/Actions are outside that protection.
-- npm test checks scheduling without contacting the attendance website.
+- npm test checks scheduling and retries without contacting the attendance website.
 - Windows installation, VPN access and live attendance must be verified on the actual Windows machine.
 
 ## Single EXE (recommended)
@@ -101,3 +102,20 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-exe.ps1
 The build embeds only an allowlist of code/templates and production dependencies.
 It runs schedule tests and a Chromium smoke test from the final EXE.
 CI also checks WinSW install/start/stop/uninstall with a harmless timer, without submitting attendance.
+
+## Per-account automatic retries
+Existing config files use these defaults without requiring edits:
+```json
+"maxRetries": 3,
+"retryDelaySeconds": 60
+```
+This means 1 initial attempt + up to 3 retries, independently for each date/account/IN or OUT.
+Other accounts continue while an account waits for its retry. Attempts, nextRetryAt and per-attempt
+logs/progress are persisted. Attempts are not reset by stop/start.
+After four pre-click failures the status is failed. After the configured window closes it becomes
+missed instead of retrying outside the window. Holidays and weekdays still apply.
+clicked jobs do not run again. An ambiguous click is unknown and needs attendance-record review;
+existing unknown jobs from older builds are not automatically replayed.
+Evidence is saved under data/runs/<date>/<hex-user>-<mode>/attempt-N/.
+Download the new EXE, stop/uninstall using the old EXE, replace it and install/start.
+Keep config.json, accounts.local.json, off_days.json and data/state.json.

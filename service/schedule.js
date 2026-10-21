@@ -40,6 +40,7 @@ function plan(config, off, accounts, state, now = new Date()) {
       const job = state[key];
       if (job.status !== "pending") continue;
       if (local.seconds > to) { job.status = "missed"; continue; }
+      if (job.nextRetryAt && now.getTime() < new Date(job.nextRetryAt).getTime()) continue;
       if (local.seconds >= job.due) jobs.push({key, job});
     }
   }

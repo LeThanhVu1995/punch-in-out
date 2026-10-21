@@ -2,6 +2,13 @@ const { chromium } = require("playwright");
 const fs = require("fs");
 const path = require("path");
 
+function progress(phase) {
+  if (!process.env.ATTEMPT_PROGRESS_FILE) return;
+  const file = process.env.ATTEMPT_PROGRESS_FILE;
+  fs.writeFileSync(file + ".tmp", JSON.stringify({phase, at:new Date().toISOString()}));
+  fs.renameSync(file + ".tmp", file);
+}
+
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -223,7 +230,9 @@ function clampDelayCfg(cfg) {
         await page.goto(TARGET_URL, { waitUntil: "networkidle" });
         await page.screenshot({ path: `04-target-${MODE}-${userTag}.png`, fullPage: true });
 
+        progress("click_started");
         await page.click(buttonSelector);
+        progress("clicked");
         await page.screenshot({ path: `05-after-click-${MODE}-${userTag}.png`, fullPage: true });
 
         console.log(`✅ ${userTag}: ${MODE} clicked`);
