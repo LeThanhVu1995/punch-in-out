@@ -20,6 +20,7 @@ function outcome(progress) {
 function complete(job, progress, config, now = new Date()) {
   const {maxRetries, retryDelaySeconds} = retryConfig(config);
   const result = outcome(progress);
+  job.phase=progress.phase;
   job.finishedAt = now.toISOString();
   job.verification=progress.verification;
   job.lastError=progress.reason || (result==="unknown"?"Interrupted after click may have started":undefined);

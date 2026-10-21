@@ -21,7 +21,7 @@ function rawAccounts(file){
 }
 let cache;
 function loadAccounts(file){
- const stat=fs.statSync(file),key=file+":"+stat.mtimeMs+":"+stat.size;
+ const stat=fs.statSync(file),key=file+":"+stat.mtimeMs+":"+stat.ctimeMs+":"+stat.ino+":"+stat.size;
  if(cache?.key===key)return cache.accounts;
  const accounts=rawAccounts(file).map(a=>({...a,password:a.passwordProtected?helper("credential-unprotect",a.passwordProtected):a.password}));
  cache={key,accounts};return accounts;

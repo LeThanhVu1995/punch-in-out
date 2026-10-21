@@ -11,7 +11,7 @@ function render(){
  const jobs=snapshot.jobs.filter(j=>j.mode===mode);
  $("subtitle").textContent=snapshot.date+" · "+snapshot.timezone+" · Dashboard trên máy này";
  $("users").textContent=jobs.length;
- $("clicked").textContent=jobs.filter(j=>["success","clicked"].includes(j.status)).length;
+ $("clicked").textContent=jobs.filter(j=>j.status==="success").length+" / "+jobs.filter(j=>j.status==="clicked").length;
  $("errors").textContent=jobs.filter(j=>["failed","unknown","missed"].includes(j.status)).length;
  $("waiting").textContent=jobs.filter(j=>["pending","running"].includes(j.status)).length;
  $("policy").textContent="Tự cập nhật 3 giây · Tối đa "+snapshot.maxRetries+" lần thử lại · Cách nhau "+snapshot.retryDelaySeconds+" giây";

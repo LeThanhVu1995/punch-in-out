@@ -49,7 +49,7 @@ async function pause(seconds) {
 const initialConfig = read(configPath);
 retryConfig(initialConfig);
 for (const job of Object.values(state)) if (job.status === "running") {
-  const progress = job.progressFile ? readProgress(path.resolve(root,job.progressFile)) : {};
+  const progress = job.progressFile ? readProgress(path.resolve(root,job.progressFile)) : (job.phase?{phase:job.phase}:{});
   complete(job, progress, initialConfig);
   record(root,job,progress);
 }
@@ -57,12 +57,6 @@ save();
 function stop() { stopping = true; wake(); if (active) active.kill(); }
 process.on("SIGTERM", stop); process.on("SIGINT", stop);
 async function runJob(job, config) {
-  if(config.preflight?.enabled!==false){
-    job.connection=await checkConnectivity(config);save();
-    if(!job.connection.ok)return {phase:"before_click",reason:"Website unreachable: "+job.connection.results.filter(r=>!r.ok).map(r=>r.name+" "+r.error).join("; ")};
-  }
-  if(stopping)return {phase:"before_click",reason:"Service stopped before browser launch"};
-  return new Promise(resolve => {
     const folder = path.join(dataDir,"runs",job.date,
       Buffer.from(job.username).toString("hex") + "-" + job.mode, "attempt-" + job.attempts);
     fs.mkdirSync(folder,{recursive:true});
@@ -71,6 +65,12 @@ async function runJob(job, config) {
     // Persist attempt and phase before launching; each attempt has its own evidence.
     fs.writeFileSync(progressFile, JSON.stringify({phase:"before_click"}));
     save();
+  if(config.preflight?.enabled!==false){
+    job.connection=await checkConnectivity(config);save();
+    if(!job.connection.ok)return {phase:"before_click",reason:"Website unreachable: "+job.connection.results.filter(r=>!r.ok).map(r=>r.name+" "+r.error).join("; ")};
+  }
+  if(stopping)return {phase:"before_click",reason:"Service stopped before browser launch"};
+  return new Promise(resolve => {
     const output = fs.openSync(path.join(folder,"run.log"), "a");
     const emptyOff = path.join(folder,"off.json");
     fs.writeFileSync(emptyOff, JSON.stringify({timezone:config.timezone,skipWeekends:false}));
@@ -124,6 +124,8 @@ function settings() {
         if (!eligible) {save();continue;}
         job.attemptsInCycle = (job.attemptsInCycle ?? job.attempts ?? 0) + 1;
         job.attempts = (job.attempts || 0) + 1;
+        for(const field of ["progressFile","connection","verification","finishedAt","lastError"])delete job[field];
+        job.phase="before_click";
         job.status="running"; job.startedAt=new Date().toISOString(); save();
         const progress = await runJob(job,config);
         complete(job,progress,config);
