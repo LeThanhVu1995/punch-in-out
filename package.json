@@ -7,7 +7,7 @@
   },
   "scripts": {
     "start": "node service/worker.js",
-    "test": "node --test test/schedule.test.js test/retry.test.js test/dashboard.test.js"
+    "test": "node --test test/schedule.test.js test/retry.test.js test/dashboard.test.js test/upgrades.test.js"
   },
   "engines": {
     "node": ">=22"

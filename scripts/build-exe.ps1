@@ -20,7 +20,7 @@ try {
   $env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $stage "browsers"
   npx playwright install chromium
   Check-Exit "Browser installation failed"
-  node --test test/schedule.test.js test/retry.test.js test/dashboard.test.js
+  node --test test/schedule.test.js test/retry.test.js test/dashboard.test.js test/upgrades.test.js
   Check-Exit "Scheduler tests failed"
   node packaging/smoke.cjs
   Check-Exit "Browser smoke test failed"

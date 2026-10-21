@@ -1,144 +1,145 @@
 # Punch In Out — Windows Service
 
-Node.js + Playwright worker, wrapped as a Windows Service with WinSW.
-VPN is managed by the machine; this application never connects or disconnects it.
+Single Windows x64 EXE with Node.js, Playwright, Chromium and WinSW.
+VPN stays under the machine/user's control. The computer must remain awake and connected.
 
-## Schedule
-- Asia/Ho_Chi_Minh, Monday–Friday.
-- IN: random time per account each day, 07:20–08:30 inclusive.
-- OUT: random time per account each day, 17:40–18:35 inclusive.
-- Existing off_days.json global and per-user holidays are respected.
-- Schedule is saved before executing. Restart keeps the selected times.
-- A pending overdue job runs only while its window is still open. Past-window jobs are missed.
-- Serial execution: other accounts may wait; the window is checked before every run.
-- The old batch start/between-user delays are disabled for service jobs because times are selected individually.
-- Changes to windows affect newly generated jobs; existing daily times remain persisted.
-- Config and holiday files are reread on each polling cycle.
+## Download / first install
+GitHub Actions > latest successful **Build Windows EXE** run > Artifacts >
+**PunchService-windows-x64**. Extract PunchService.exe into a permanent directory.
+The EXE extracts its bundled runtime into .runtime/ on first use; retain that directory.
 
-## Install (Windows x64)
-1. Install Node.js 22 or newer. Clone/download this repository to a permanent directory.
-2. Copy config.example.json to config.json. Fill URLs and selectors in environment using the values previously configured as GitHub Secrets. GitHub Secrets are not downloaded to this machine.
-3. Create accounts.local.json with your accounts:
-   ```json
-   [{"username":"your-user","password":"your-password"}]
-   ```
-   Local configuration/accounts are gitignored. Restrict their Windows file permissions.
-   The legacy accounts.json is kept for existing Actions compatibility; it is not the service default.
-4. Download **WinSW-x64.exe v2.12.0** from https://github.com/winsw/winsw/releases/tag/v2.12.0, rename to PunchService.exe and put beside package.json.
-5. Open PowerShell as Administrator in the repository:
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File .\scripts\install-service.ps1
-   ```
-6. Open services.msc. If the preconnected VPN is user-scoped, set Punch In Out > Properties > Log On to the Windows account that can access the target via VPN. Confirm reachability under that account. Start the service:
-   ```powershell
-   .\PunchService.exe start
-   .\PunchService.exe status
-   ```
-   Installation does not start the worker, allowing account/network configuration first.
-
-Machine must be on and awake. A service cannot use a disconnected user VPN.
-Chromium is installed into the repository browsers directory so the service account can access it.
-Grant the service account read access to the repo/config/browser and write access to data/ and logs/.
-
-## Manage
+Open PowerShell as Administrator:
 ```powershell
+.\PunchService.exe init
+```
+Fill config.json URLs/selectors and accounts.local.json:
+```json
+[{"username":"your-user","password":"your-password","enabled":true}]
+```
+Then:
+```powershell
+.\PunchService.exe install
+.\PunchService.exe start
+.\PunchService.exe dashboard
+```
+No separate Node.js, browser or .NET installation is required on the target machine.
+Install automatically encrypts account passwords before the worker starts.
+Use services.msc > Punch In Out > Log On if the preconnected VPN requires a particular Windows account.
+After changing Log On, run protect-accounts as Administrator to refresh account-file permissions.
+
+## Upgrade / manage any older build
+Run the NEW EXE as Administrator:
+```powershell
+.\PunchService.exe upgrade
+```
+It finds the existing registered service and its data directory, stops it, extracts the new runtime,
+updates the existing service path and preserves its Windows Log On account. A previously running
+service resumes; a stopped service stays stopped. Settings and history are kept.
+You may run the new EXE from a download folder: it copies itself to the existing installation folder.
+install also upgrades an existing service. No manual uninstall/state deletion is needed.
+
+```powershell
+.\PunchService.exe status
 .\PunchService.exe stop
 .\PunchService.exe start
 .\PunchService.exe restart
-powershell -ExecutionPolicy Bypass -File .\scripts\uninstall-service.ps1
+.\PunchService.exe uninstall
+.\PunchService.exe protect-accounts
 ```
+Management commands find the registered service independently of which EXE build you use.
+run is a LIVE foreground worker; never use it alongside the service/Actions for the same accounts.
+self-test uses only local fixtures and never connects to the real attendance website.
+Unsigned binaries may display Windows SmartScreen. Keep installation/runtime write access restricted
+to trusted administrators and the service identity. Closing the dashboard does not stop the service.
 
-For foreground use: npm start. This is a LIVE worker that can punch; do not run it alongside Actions or another installation for the same accounts.
-Do not schedule the old GitHub workflow in parallel with this service.
+## Schedule and retries
+Default timezone Asia/Ho_Chi_Minh, Monday–Friday:
+- IN: independent random time per user from 07:20 to 08:30.
+- OUT: independent random time per user from 17:40 to 18:35.
+- off_days.json global/per-user holidays and weekend exclusions apply.
+Selected times are saved in data/state.json before execution. Restart retains them.
+Pending jobs may run late within their window; past-window jobs become missed.
+Accounts run serially. Checks occur every pollSeconds (default 15).
 
-## Results and failure handling
-- data/state.json stores selected times and statuses.
-- data/runs/YYYY-MM-DD/<hex-username>-IN or OUT contains run.log, results.json, screenshots and debug HTML.
-- logs/ contains wrapper/stdout/stderr logs. Periodically remove old run folders as needed.
-- clicked means Playwright clicked the button, **not verified server acceptance**.
-- Failures before the punch click are retried up to 3 times (4 attempts total), 60 seconds apart. A persisted pre-click running attempt is recovered after restart with the same attempt budget.
-- Once a punch click starts, failures remain unknown; no automatic repeat because the server may already have accepted the click. Legacy unknown jobs remain unchanged.
-- Inspect the website attendance record before any manual retry. Do not delete the state file merely to restart the service.
-- The local PID lock prevents simultaneous workers using this folder. Separate clones/Actions are outside that protection.
-- npm test checks scheduling and retries without contacting the attendance website.
-- Windows installation, VPN access and live attendance must be verified on the actual Windows machine.
+Pre-click failures retry up to 3 times (4 attempts total), 60 seconds apart.
+Other accounts proceed while retries wait. Attempts and retry times survive restart.
+Once a punch click may have started, ambiguous outcomes never automatically repeat.
+Legacy unknown jobs are retained. Manual replays require reviewing attendance first.
+A manual replay begins a fresh retry budget while keeping total attempt numbers and old logs.
 
-## Single EXE (recommended)
-Open GitHub Actions > Build Windows EXE > latest successful run > download
-**PunchService-windows-x64** artifact. Extract PunchService.exe into a permanent writable folder.
-No separate Node.js, WinSW, browser or .NET installation is needed on the target Windows x64 machine.
+## Local dashboard
+Open http://127.0.0.1:17840 on the Windows machine, or use the dashboard EXE command.
+The service cannot open a desktop browser on its own.
+- Monitor: readable IN/OUT due times, statuses, retry counts, connectivity and latest logs.
+- Run now: one user, failed/missed users, or all accounts for the selected IN/OUT mode.
+  Manual commands apply to today only and bypass that day's window/holidays.
+  Running users are skipped. Repeating success/clicked/unknown users requires explicit confirmation.
+- History: date picker and an individual record/log for each attempt.
+- Settings: add/remove/enable/disable users; change passwords, windows, weekdays, holidays,
+  retries, timeouts, URLs/selectors, connectivity checks and verification rules.
+Blank password inputs preserve existing passwords; stored passwords/ciphertext never return to the browser.
+Editors use file revisions to reject stale saves.
+Already selected daily due times remain persisted; changed windows immediately act as limits and are
+used for future daily plans. An already running disabled/removed user may finish its current attempt.
 
-```powershell
-.\PunchService.exe init
-# Edit config.json, accounts.local.json and off_days.json beside the EXE.
-# Then open an Administrator terminal:
-.\PunchService.exe install
-# Configure service Log On account in services.msc if needed for your preconnected VPN.
-.\PunchService.exe start
-.\PunchService.exe status
-```
+The dashboard listens on loopback only. Action requests require same-origin checks and a session token.
+It has no separate user login; other users signed into this Windows machine may access it.
+Set dashboard.enabled=false or change dashboard.port in config.json and restart if needed.
 
-Commands: init, install, start, stop, restart, status, uninstall, run (LIVE foreground worker),
-self-test (offline schedule/browser tests), help. Double-click shows help; use a terminal for commands.
-The EXE embeds Node.js, dependencies, Chromium and WinSW. It extracts them to .runtime/
-beside itself once; keep that folder and the EXE in place while installed.
-This is a single distribution EXE, not a service that runs without extracted runtime files.
-The browser makes the EXE large and first launch slower.
-Service install intentionally does not start punching.
-Generated templates contain no real credentials or personal holiday dates.
-Keep config/accounts private and copy existing holidays if needed.
-Restrict write access to the installation folder, configuration and runtime to trusted administrators
-and the intended service account; grant the account access to data/log folders.
+## Verify actual attendance success
+No website-specific success selector or API is guessed. Until configured, the worker reports
+clicked (unverified), never success. Configure one of these in dashboard Settings:
+1. **selector**: the success result's CSS selector plus expected success text. Visible content
+   must change after the click; a stale success message is rejected.
+2. **response**: URL substring, optional HTTP method, JSON path and exact expected JSON value.
+   A matching 2xx response AND the business value are required. HTTP 200 alone is insufficient.
+   Example data.accepted equals true is only appropriate if that is the site's actual response.
 
-For upgrades: stop and uninstall with the OLD EXE, replace it, install and start the NEW EXE.
-Configuration and data/state.json are preserved; never delete state to perform an upgrade.
-Do not install this package alongside the earlier source-based service; both use service ID PunchInOut.
-Unsigned builds may trigger Windows SmartScreen; code signing is not included.
+Provide the real success-message HTML or Network response from the attendance website to configure it.
+Verification timeout or ambiguous response is not treated as a confirmed failure to be punched again.
 
-To build locally on Windows x64, install Node.js 22 and .NET SDK 8, then:
+| Status | Meaning |
+| --- | --- |
+| pending | Waiting for the due/retry time |
+| running | Attempt in progress |
+| success | Configured website success evidence matched |
+| clicked | Button clicked; attendance still unverified |
+| unknown | Interrupted/ambiguous after a click may have started |
+| failed | Pre-click retries exhausted |
+| missed | Window/day expired |
+
+## Connectivity
+Default preflight checks LOGIN_URL and TARGET_URL without logging in/punching.
+DNS/TLS/timeout and HTTP 5xx failures count as pre-click failures and retry within the budget.
+Reachable login/auth redirects prove network reachability, not successful login.
+The dashboard's connection-check button performs the same read-only test.
+VPN is never connected/disconnected by this app.
+
+## Password protection
+Windows DPAPI LocalMachine encrypts account passwords; the account file's ACL allows SYSTEM,
+administrators, the service identity and the identity performing migration.
+Machine-scope DPAPI relies on these file permissions to restrict other local users.
+The helper receives secrets through stdin, never command-line arguments or plaintext temporary files.
+Passwords are decrypted in process memory. Encrypted files require the same Windows machine.
+Existing plaintext backups, copies and Git history are not automatically removed.
+
+## Data / source build
+- config.json, accounts.local.json, off_days.json: local settings (gitignored).
+- data/state.json: persistent scheduling and retry state; do not delete to upgrade.
+- data/history.jsonl: append-only attempts; dashboard reads the latest 20 MB.
+- data/runs/<date>/<hex-user>-<mode>/attempt-N/: logs, screenshots and progress evidence.
+- data/manual-actions.jsonl: manual-action audit without passwords.
+- logs/: WinSW/worker stdout and stderr.
+Old versions did not retain every attempt; imported historical rows are marked legacy.
+
+Source mode: install Node.js >=22, npm install, npx playwright install chromium, npm start.
+Source mode reads plaintext legacy accounts; Windows EXE is required to edit/protect passwords.
+npm test runs local automated tests. On Windows with the helper, it also checks real DPAPI/ACLs.
+To build the complete EXE on Windows with Node.js 22 and .NET SDK 8:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\build-exe.ps1
 ```
-The build embeds only an allowlist of code/templates and production dependencies.
-It runs schedule tests and a Chromium smoke test from the final EXE.
-CI also checks WinSW install/start/stop/uninstall with a harmless timer, without submitting attendance.
-
-## Per-account automatic retries
-Existing config files use these defaults without requiring edits:
-```json
-"maxRetries": 3,
-"retryDelaySeconds": 60
-```
-This means 1 initial attempt + up to 3 retries, independently for each date/account/IN or OUT.
-Other accounts continue while an account waits for its retry. Attempts, nextRetryAt and per-attempt
-logs/progress are persisted. Attempts are not reset by stop/start.
-After four pre-click failures the status is failed. After the configured window closes it becomes
-missed instead of retrying outside the window. Holidays and weekdays still apply.
-clicked jobs do not run again. An ambiguous click is unknown and needs attendance-record review;
-existing unknown jobs from older builds are not automatically replayed.
-Evidence is saved under data/runs/<date>/<hex-user>-<mode>/attempt-N/.
-Download the new EXE, stop/uninstall using the old EXE, replace it and install/start.
-Keep config.json, accounts.local.json, off_days.json and data/state.json.
-
-## Local dashboard
-After starting the service, open http://127.0.0.1:17840 on that Windows machine.
-It shows today's account IN/OUT schedules (formatted times), statuses, attempt counts, retry times
-and the latest attempt log. It refreshes every 3 seconds. Passwords/configuration are never returned;
-password strings are redacted from displayed logs.
-Choose IN or OUT before using **Active / Run all now**, **Retry failed**, or an account's Run now button.
-Manual commands apply to today only, override that day's hours/holidays, and queue accounts serially.
-A running account is skipped. Repeating clicked or unknown accounts requires explicit confirmation
-because the site uses a shared Punch In/Out button. Check attendance before confirming.
-Manual requests are persisted and duplicate request IDs are ignored. A new explicit manual run
-starts a new retry budget; total attempt numbers and all previous logs are retained.
-The dashboard listens only on 127.0.0.1 and checks Host/Origin plus a session token for actions.
-It has no remote-network access or user login: other users on this same Windows machine may access it.
-Dashboard actions are recorded in data/manual-actions.jsonl without passwords.
-Default for existing configs is enabled on port 17840. Optionally configure:
-```json
-"dashboard": { "enabled": true, "port": 17840 }
-```
-Restart the service after changing the port/enabled flag. If the port is already used, choose another
-port or disable the dashboard before restarting.
-A Windows service does not open a browser window in the user's desktop session; open the local URL
-yourself. Closing the browser does not stop the service.
+The build includes only explicit code/templates, never real config/accounts/holidays.
+CI checks schedule/retry/dashboard/settings/history/connectivity/verification, DPAPI, browser UI,
+service install/start/upgrade/stop/uninstall and management from a relocated EXE.
+Production website/VPN behavior must still be verified on the target machine.

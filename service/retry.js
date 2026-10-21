@@ -12,6 +12,7 @@ function readProgress(file) {
   try {return JSON.parse(fs.readFileSync(file,"utf8"));} catch {return {};}
 }
 function outcome(progress) {
+  if (progress.phase === "verified") return "success";
   if (progress.phase === "clicked") return "clicked";
   if (progress.phase === "before_click") return "retryable";
   return "unknown";
@@ -20,6 +21,8 @@ function complete(job, progress, config, now = new Date()) {
   const {maxRetries, retryDelaySeconds} = retryConfig(config);
   const result = outcome(progress);
   job.finishedAt = now.toISOString();
+  job.verification=progress.verification;
+  job.lastError=progress.reason || (result==="unknown"?"Interrupted after click may have started":undefined);
   delete job.nextRetryAt;
   if (result === "retryable") {
     if ((job.attemptsInCycle ?? job.attempts) < 1 + maxRetries) {

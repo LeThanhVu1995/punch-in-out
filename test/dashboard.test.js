@@ -86,11 +86,11 @@ test("live worker handles dashboard manual command without live browser or dupli
  const {spawn}=require("node:child_process");
  const root=fs.mkdtempSync(path.join(os.tmpdir(),"punch-dashboard-worker-"));
  fs.mkdirSync(path.join(root,"service"));
- for(const name of ["worker.js","schedule.js","retry.js","manual.js","dashboard.js"])
+ for(const name of fs.readdirSync(path.join(__dirname,"../service")).filter(name=>name.endsWith(".js")))
   fs.copyFileSync(path.join(__dirname,"../service",name),path.join(root,"service",name));
  fs.writeFileSync(path.join(root,"run.js"),'const fs=require("fs");console.log("stub attempt");fs.writeFileSync(process.env.ATTEMPT_PROGRESS_FILE,JSON.stringify({phase:"clicked"}));');
  const port=await freePort(),url="http://127.0.0.1:"+port;
- const cfg={...config,accountsFile:"accounts.json",offDaysFile:"off.json",dashboard:{port},pollSeconds:1,jobTimeoutSeconds:5,
+ const cfg={...config,preflight:{enabled:false},accountsFile:"accounts.json",offDaysFile:"off.json",dashboard:{port},pollSeconds:1,jobTimeoutSeconds:5,
   environment:Object.fromEntries(["LOGIN_URL","TARGET_URL","USERNAME_SELECTOR","PASSWORD_SELECTOR","SUBMIT_SELECTOR","BUTTON_IN_SELECTOR","BUTTON_OUT_SELECTOR"].map(k=>[k,"unused"]))};
  fs.writeFileSync(path.join(root,"config.json"),JSON.stringify(cfg));
  fs.writeFileSync(path.join(root,"accounts.json"),JSON.stringify(accounts));

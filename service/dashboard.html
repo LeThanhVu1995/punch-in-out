@@ -24,25 +24,53 @@ td{padding:14px 18px;border-top:1px solid #edf1f5;font-variant-numeric:tabular-n
 .missed{background:#f0eafa;color:#76529c}.small{font-size:12px;color:#76879a}
 .notice{margin:16px 0;padding:14px 18px;background:#eaf2f8;border-radius:10px;color:#4a6379;line-height:1.6}
 #message{min-height:24px;color:#167e77;margin:12px 0}footer{display:flex;justify-content:space-between;margin-top:16px}
+.tabs{display:flex;gap:8px;margin-bottom:18px}.tabs button.active{background:#183d56;color:white}
+[hidden]{display:none!important}.formgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+label.field{display:flex;flex-direction:column;gap:6px;color:#52677c;font-size:12px}label.field input,label.field select,label.field textarea{width:100%}
+textarea{font:inherit;border:1px solid #d8e1e9;border-radius:7px;padding:10px;min-height:90px;resize:vertical}
+.editor{padding:22px}.editor h3{margin:12px 0}.wide{grid-column:1/-1}.editorbar{display:flex;justify-content:space-between;align-items:center;margin:18px 0}
+.success{background:#d4f5e5;color:#146b46}.muted{color:#7e8f9e}.error-text{max-width:320px;white-space:normal;color:#a64a40;font-size:12px}
+@media(max-width:720px){.formgrid{grid-template-columns:1fr}.tabs{overflow:auto}}
 dialog{border:1px solid #dce4ed;border-radius:12px;max-width:900px;width:90vw;padding:24px}
 dialog::backdrop{background:#102b4560}pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:60vh;overflow:auto;background:#112b40;color:#dbe9f3;padding:16px;border-radius:8px}
 @media(max-width:720px){main{padding:16px}.cards{grid-template-columns:repeat(2,1fr)}header{align-items:flex-start}.toolbar{gap:8px}th,td{padding:12px}}
 </style></head><body><main>
 <header><div><div class="eyebrow">LOCAL SERVICE CONSOLE</div><h1>Punch Control</h1><p id="subtitle">Đang kết nối service…</p></div><span class="live" id="connection">Connecting</span></header>
+<nav class="tabs"><button id="tab-monitor" class="active">Theo dõi</button><button id="tab-history">Lịch sử</button><button id="tab-settings">Cài đặt &amp; tài khoản</button></nav>
 <section class="cards">
 <div class="card"><span>Tài khoản</span><div class="number" id="users">—</div></div>
-<div class="card"><span>Đã bấm · lượt đang xem</span><div class="number" id="clicked">—</div></div>
+<div class="card"><span>Đã xác minh / đã bấm</span><div class="number" id="clicked">—</div></div>
 <div class="card"><span>Lỗi / cần kiểm tra</span><div class="number" id="errors">—</div></div>
 <div class="card"><span>Đang chờ / đang chạy</span><div class="number" id="waiting">—</div></div>
 </section>
-<div class="panel"><div class="toolbar">
+<section id="monitor"><div class="panel"><div class="toolbar">
+<input type="date" id="date" aria-label="Ngày xem"><button id="today">Hôm nay</button>
 <select id="mode" aria-label="Lượt chấm công"><option value="IN">Buổi sáng · IN</option><option value="OUT">Buổi chiều · OUT</option></select>
 <input id="search" placeholder="Tìm tài khoản…" aria-label="Tìm tài khoản">
 <select id="filter" aria-label="Lọc trạng thái"><option value="all">Tất cả trạng thái</option><option value="errors">Lỗi / quá giờ</option><option value="pending">Đang chờ</option><option value="clicked">Đã bấm</option></select>
 <div class="spacer"></div><button id="refresh">Làm mới</button><button id="failed">Chạy lại lượt lỗi</button><button class="primary" id="activate">Active · Chạy tất cả ngay</button>
 </div><div class="scroll"><table><thead><tr><th>Tài khoản</th><th>Giờ hẹn</th><th>Trạng thái</th><th>Lần thử</th><th>Bắt đầu / kết thúc</th><th>Thao tác</th></tr></thead><tbody id="rows"></tbody></table></div></div>
+</section>
 <div id="message" role="status"></div>
-<div class="notice">Chạy ngay áp dụng cho lượt IN hoặc OUT đang chọn, bỏ qua khung giờ và ngày nghỉ hôm nay. Lượt đang chạy không bị xếp lại. “Đã bấm” chưa xác nhận website đã ghi nhận; kiểm tra chấm công trước khi lặp lại lượt đã bấm hoặc chưa rõ kết quả.</div>
+
+<section id="history" class="panel" hidden><div class="toolbar"><h3>Lịch sử từng lần thử</h3><span class="small" id="historydate"></span><div class="spacer"></div><button id="history-refresh">Làm mới</button></div>
+<p style="padding:0 18px">Chọn ngày ở tab Theo dõi. Dữ liệu cũ trước khi nâng cấp chỉ có trạng thái cuối, có nhãn “cũ”.</p>
+<div class="scroll"><table><thead><tr><th>User / lượt</th><th>Lần</th><th>Kết quả</th><th>Bắt đầu → kết thúc</th><th>Chi tiết</th><th>Log</th></tr></thead><tbody id="historyrows"></tbody></table></div></section>
+<section id="settings" class="panel editor" hidden>
+<div class="editorbar"><h2>Cài đặt</h2><button id="load-editor">Tải lại dữ liệu</button></div>
+<p>Thay đổi được đọc lại khi service chạy; giờ ngẫu nhiên đã chọn hôm nay vẫn được giữ. Lưu từng nhóm riêng.</p>
+<h3>Lịch &amp; kết nối</h3>
+<div class="formgrid" id="configfields"></div><p id="settings-note"></p><button class="primary" id="save-config">Lưu cấu hình</button>
+<h3>Tài khoản</h3><p id="protection-note">Mật khẩu không được hiển thị. Để trống để giữ mật khẩu hiện tại.</p>
+<div class="scroll"><table><thead><tr><th>User</th><th>Mật khẩu mới</th><th>Bật</th><th>Bảo vệ</th><th></th></tr></thead><tbody id="accountrows"></tbody></table></div>
+<div class="editorbar"><button id="add-account">Thêm tài khoản</button><button class="primary" id="save-accounts">Lưu &amp; bảo vệ mật khẩu</button></div>
+<h3>Ngày nghỉ</h3><label class="field">Ngày nghỉ chung (YYYY-MM-DD, mỗi dòng một ngày)<textarea id="global-holidays"></textarea></label>
+<label><input id="skip-weekends" type="checkbox"> Nghỉ thứ Bảy / Chủ nhật</label>
+<div class="scroll"><table><thead><tr><th>User</th><th>Ngày nghỉ riêng (mỗi dòng một ngày)</th></tr></thead><tbody id="holidayrows"></tbody></table></div>
+<button class="primary" id="save-holidays">Lưu ngày nghỉ</button>
+</section>
+
+<div class="notice"><div id="health">Kết nối: chưa kiểm tra</div><button id="check-network">Kiểm tra website / VPN</button><br>Chạy ngay áp dụng cho lượt IN hoặc OUT đang chọn, bỏ qua khung giờ và ngày nghỉ hôm nay. Lượt đang chạy không bị xếp lại. “Đã xác minh” chỉ xuất hiện khi phản hồi thành công khớp cấu hình. “Đã bấm” chưa xác nhận website đã ghi nhận; kiểm tra chấm công trước khi lặp lại lượt đã bấm hoặc chưa rõ kết quả.</div>
 <footer class="small"><span id="policy">Tự cập nhật mỗi 3 giây</span><span id="updated">—</span></footer>
 <dialog id="logs"><h3 id="logtitle">Log</h3><pre id="logtext"></pre><button id="closeLogs">Đóng</button></dialog>
 </main><script src="/dashboard.js"></script></body></html>

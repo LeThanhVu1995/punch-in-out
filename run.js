@@ -1,11 +1,13 @@
 const { chromium } = require("playwright");
 const fs = require("fs");
 const path = require("path");
+const {loadAccounts} = require("./service/accounts");
+const {prepareVerification} = require("./service/verification");
 
-function progress(phase) {
+function progress(phase, details = {}) {
   if (!process.env.ATTEMPT_PROGRESS_FILE) return;
   const file = process.env.ATTEMPT_PROGRESS_FILE;
-  fs.writeFileSync(file + ".tmp", JSON.stringify({phase, at:new Date().toISOString()}));
+  fs.writeFileSync(file + ".tmp", JSON.stringify({phase, ...details, at:new Date().toISOString()}));
   fs.renameSync(file + ".tmp", file);
 }
 
@@ -88,6 +90,7 @@ function clampDelayCfg(cfg) {
     LIMIT = "9999",
   } = process.env;
 
+  const verificationConfig = JSON.parse(process.env.PUNCH_VERIFICATION || '{"mode":"none"}');
   const buttonSelector = MODE === "OUT" ? BUTTON_OUT_SELECTOR : BUTTON_IN_SELECTOR;
 
   const must = [
@@ -106,7 +109,7 @@ function clampDelayCfg(cfg) {
   if (!fs.existsSync(ACCOUNTS_FILE)) {
     throw new Error(`Missing accounts file: ${ACCOUNTS_FILE}`);
   }
-  const accounts = JSON.parse(fs.readFileSync(ACCOUNTS_FILE, "utf-8"));
+  const accounts = loadAccounts(ACCOUNTS_FILE).filter(account=>account.enabled!==false);
   if (!Array.isArray(accounts) || accounts.length === 0) {
     throw new Error("accounts.json is empty or invalid");
   }
@@ -195,6 +198,7 @@ function clampDelayCfg(cfg) {
       const page = await context.newPage();
       page.setDefaultTimeout(60000);
 
+      let phase = "before_click";
       try {
         await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded" });
         await page.screenshot({ path: `01-login-${MODE}-${userTag}.png`, fullPage: true });
@@ -232,21 +236,27 @@ function clampDelayCfg(cfg) {
 
         // Resolve visibility/actionability before committing to a potentially non-idempotent click.
         await page.locator(buttonSelector).click({ trial: true });
-        progress("click_started");
-        await page.click(buttonSelector);
-        progress("clicked");
-        await page.screenshot({ path: `05-after-click-${MODE}-${userTag}.png`, fullPage: true });
-
-        console.log(`✅ ${userTag}: ${MODE} clicked`);
-        results.push({ user: userTag, ok: true });
+        const verify = await prepareVerification(page,verificationConfig);
+        const verification = await verify(async()=>{
+          phase="click_started";progress(phase);
+          await page.click(buttonSelector);
+          phase="clicked";progress(phase);
+        });
+        phase=verification.verified?"verified":"clicked";
+        progress(phase,{verification,reason:verification.reason});
+        await page.screenshot({ path: `05-after-click-${MODE}-${userTag}.png`, fullPage: true }).catch(()=>{});
+        console.log(`${userTag}: ${MODE} ${phase}`);
+        results.push({user:userTag,ok:true,verified:verification.verified,verification});
       } catch (e) {
-        console.error(`❌ ${userTag}:`, e);
+        const safeError=String(e).split(password).join("[REDACTED]");
+        progress(phase,{reason:safeError});
+        console.error(`❌ ${userTag}:`, safeError);
 
         const html = await page.content().catch(() => "");
         fs.writeFileSync(`debug-${MODE}-${userTag}.html`, html || "");
-        await page.screenshot({ path: `error-${MODE}-${userTag}.png`, fullPage: true });
+        await page.screenshot({ path: `error-${MODE}-${userTag}.png`, fullPage: true }).catch(()=>{});
 
-        results.push({ user: userTag, ok: false, error: String(e) });
+        results.push({ user: userTag, ok: false, error: safeError });
       } finally {
         await context.close();
       }
@@ -269,4 +279,4 @@ function clampDelayCfg(cfg) {
   } finally {
     await browser.close();
   }
-})();
+})().catch(error=>{console.error("Runner failed:",error.message);process.exitCode=1;});

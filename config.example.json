@@ -35,5 +35,13 @@
   "dashboard": {
     "enabled": true,
     "port": 17840
+  },
+  "preflight": {
+    "enabled": true,
+    "timeoutMs": 5000
+  },
+  "verification": {
+    "mode": "none",
+    "timeoutMs": 15000
   }
 }

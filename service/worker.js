@@ -5,6 +5,9 @@ const {spawn} = require("child_process");
 const {dueJobs} = require("./manual");
 const {startDashboard} = require("./dashboard");
 const {retryConfig, readProgress, complete} = require("./retry");
+const {loadAccounts}=require("./accounts");
+const {checkConnectivity}=require("./connectivity");
+const {record}=require("./history");
 const codeRoot = path.resolve(__dirname, "..");
 const root = process.env.PUNCH_ROOT ? path.resolve(process.env.PUNCH_ROOT) : codeRoot;
 const configPath = path.resolve(root, process.env.PUNCH_CONFIG || "config.json");
@@ -48,11 +51,17 @@ retryConfig(initialConfig);
 for (const job of Object.values(state)) if (job.status === "running") {
   const progress = job.progressFile ? readProgress(path.resolve(root,job.progressFile)) : {};
   complete(job, progress, initialConfig);
+  record(root,job,progress);
 }
 save();
 function stop() { stopping = true; wake(); if (active) active.kill(); }
 process.on("SIGTERM", stop); process.on("SIGINT", stop);
-function runJob(job, config) {
+async function runJob(job, config) {
+  if(config.preflight?.enabled!==false){
+    job.connection=await checkConnectivity(config);save();
+    if(!job.connection.ok)return {phase:"before_click",reason:"Website unreachable: "+job.connection.results.filter(r=>!r.ok).map(r=>r.name+" "+r.error).join("; ")};
+  }
+  if(stopping)return {phase:"before_click",reason:"Service stopped before browser launch"};
   return new Promise(resolve => {
     const folder = path.join(dataDir,"runs",job.date,
       Buffer.from(job.username).toString("hex") + "-" + job.mode, "attempt-" + job.attempts);
@@ -68,6 +77,7 @@ function runJob(job, config) {
     active = spawn(process.execPath, [path.join(codeRoot,"run.js")], {
       cwd:folder, env:{...process.env,...Object.fromEntries(Object.entries(config.environment || {}).filter(([,v])=>v)),
         MODE:job.mode, ACCOUNT_USERNAME:job.username, ATTEMPT_PROGRESS_FILE:progressFile,
+        PUNCH_VERIFICATION:JSON.stringify(config.verification || {mode:"none"}),
         ACCOUNTS_FILE:path.resolve(root,config.accountsFile), OFF_DAYS_FILE:emptyOff},
       stdio:["ignore",output,output]
     });
@@ -91,17 +101,18 @@ function settings() {
       !Number.isFinite(config.jobTimeoutSeconds) || config.jobTimeoutSeconds < 1)
     throw new Error("pollSeconds and jobTimeoutSeconds must be positive");
   retryConfig(config);
-  const accounts = read(path.resolve(root,config.accountsFile));
-  if (!Array.isArray(accounts) || !accounts.length ||
+  const allAccounts = loadAccounts(path.resolve(root,config.accountsFile));
+  const accounts = allAccounts.filter(a=>a.enabled!==false);
+  if (!Array.isArray(accounts) || !allAccounts.length ||
       new Set(accounts.map(a=>a.username)).size !== accounts.length) throw new Error("Invalid or duplicate accounts");
   const off = read(path.resolve(root,config.offDaysFile));
-  return {config,accounts,off};
+  return {config,accounts,allAccounts,off};
 }
 
 (async () => {
   try {
     console.log("Punch service started. VPN is managed externally.");
-    dashboard=await startDashboard({root,state,save,settings,stopping:()=>stopping,wake});
+    dashboard=await startDashboard({root,configPath,state,save,settings,stopping:()=>stopping,wake});
     while (!stopping) {
       const {config,accounts,off} = settings();
       const jobs = dueJobs(config,off,accounts,state);
@@ -117,6 +128,7 @@ function settings() {
         const progress = await runJob(job,config);
         complete(job,progress,config);
         save();
+        record(root,job,progress);
         console.log(job.date,job.mode,job.username,job.status);
       }
       await pause(config.pollSeconds);

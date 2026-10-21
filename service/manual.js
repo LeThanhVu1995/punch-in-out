@@ -1,8 +1,10 @@
 const {localTime} = require("./schedule");
 function dueJobs(config, off, accounts, state, now = new Date()) {
   const {plan} = require("./schedule");
+  accounts=accounts.filter(a=>a.enabled!==false);
   const scheduled = plan(config,off,accounts,state,now).jobs;
   const {date} = localTime(now,config.timezone);
+  accounts=accounts.filter(a=>a.enabled!==false);
   const current = new Set(accounts.map(a=>a.username));
   const manual=[];
   for(const [key,job] of Object.entries(state)) {
@@ -19,13 +21,13 @@ function enqueue(config, accounts, state, request, now = new Date()) {
   if(!["all","failed","user"].includes(request.scope)) throw new Error("Invalid scope");
   if(typeof request.requestId!=="string" || !/^[a-zA-Z0-9-]{16,80}$/.test(request.requestId)) throw new Error("Invalid request ID");
   const date=localTime(now,config.timezone).date;
-  const targets=accounts.filter(a=>request.scope!=="user" || a.username===request.username);
+  const targets=accounts.filter(a=>a.enabled!==false).filter(a=>request.scope!=="user" || a.username===request.username);
   if(!targets.length) throw new Error("Account not found");
   const selected=targets.map(a=>{
     const key=JSON.stringify([date,a.username,request.mode]);
     return {key,username:a.username,job:state[key]};
   }).filter(({job})=>request.scope!=="failed" || ["failed","unknown","missed"].includes(job?.status));
-  const risky=selected.filter(({job})=>["clicked","unknown"].includes(job?.status) &&
+  const risky=selected.filter(({job})=>["success","clicked","unknown"].includes(job?.status) &&
     !job.manualRequests?.includes(request.requestId));
   if(risky.length && request.confirmRepeat!==true) {
     const error=new Error("Some accounts already clicked or have unknown results. Check attendance and explicitly confirm repeating.");
