@@ -34,7 +34,7 @@ internal static class Program
             if(args.Length>1 || !allowed.Contains(command))throw new Exception("Unknown command; use help.");
             if(command=="help")
             {
-                Console.WriteLine("PunchService.exe init|install|upgrade|start|stop|restart|status|uninstall|run|self-test|protect-accounts|dashboard");
+                Console.WriteLine("WFMicros.exe init|install|upgrade|start|stop|restart|status|uninstall|run|self-test|protect-accounts|dashboard");
                 Console.WriteLine("install automatically upgrades an existing service and keeps its Windows Log On account.");
                 return 0;
             }
@@ -132,13 +132,13 @@ internal static class Program
                 using var accountConfig=JsonDocument.Parse(File.ReadAllText(configFile));
                 string credentialsFile=Path.GetFullPath(accountConfig.RootElement.GetProperty("accountsFile").GetString()!,home);
                 byte[] originalCredentials=File.ReadAllBytes(credentialsFile);
-                string launcher=Path.Combine(home,"PunchService.exe");
+                string launcher=Path.Combine(home,"WFMicros.exe");
                 if(!Path.GetFullPath(Environment.ProcessPath!).Equals(Path.GetFullPath(launcher),StringComparison.OrdinalIgnoreCase))
                     File.Copy(Environment.ProcessPath!,launcher,true);
                 Directory.CreateDirectory(Path.Combine(home,"logs"));
                 string xml=$"""
                 <service>
-                  <id>PunchInOut</id><name>Punch In Out</name>
+                  <id>PunchInOut</id><name>WFMicros</name>
                   <description>Verified daily punch scheduler with local dashboard</description>
                   <executable>{Xml(node)}</executable>
                   <arguments>"{Xml(Path.Combine(runtime,"service","worker.js"))}"</arguments>
@@ -159,7 +159,7 @@ internal static class Program
                 }
                 else
                 {
-                    if(ServiceTools.Sc("config",ServiceTools.Name,"binPath=","\""+wrapper+"\"")!=0)
+                    if(ServiceTools.Sc("config",ServiceTools.Name,"binPath=","\""+wrapper+"\"","DisplayName=","WFMicros")!=0)
                     {
                         if(oldXml!=null)File.WriteAllText(xmlPath,oldXml);
                         throw new Exception("Service upgrade failed; existing service registration retained.");

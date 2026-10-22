@@ -12,15 +12,15 @@ if ($LASTEXITCODE -ne 0) { throw "npm install failed" }
 $env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $root "browsers"
 npx playwright install chromium
 if ($LASTEXITCODE -ne 0) { throw "Chromium installation failed" }
-$exe = Join-Path $root "PunchService.exe"
+$exe = Join-Path $root "WFMicros.exe"
 if (!(Test-Path $exe)) {
-  throw "Download WinSW-x64.exe v2.12.0 from https://github.com/winsw/winsw/releases/tag/v2.12.0 and save it as PunchService.exe in the repository folder."
+  throw "Download WinSW-x64.exe v2.12.0 from https://github.com/winsw/winsw/releases/tag/v2.12.0 and save it as WFMicros.exe in the repository folder."
 }
 $nodeXml = [System.Security.SecurityElement]::Escape($node)
 @"
 <service>
   <id>PunchInOut</id>
-  <name>Punch In Out</name>
+  <name>WFMicros</name>
   <description>Weekday punch scheduler. VPN managed externally.</description>
   <executable>$nodeXml</executable>
   <arguments>"%BASE%\service\worker.js"</arguments>
@@ -32,7 +32,7 @@ $nodeXml = [System.Security.SecurityElement]::Escape($node)
   <onfailure action="restart" delay="30 sec"/>
   <stoptimeout>20 sec</stoptimeout>
 </service>
-"@ | Set-Content -Path (Join-Path $root "PunchService.xml") -Encoding UTF8
+"@ | Set-Content -Path (Join-Path $root "WFMicros.xml") -Encoding UTF8
 & $exe install
 if ($LASTEXITCODE -ne 0) { throw "Service installation failed" }
-Write-Host "Installed. In services.msc, configure the Log On account if your VPN is user-scoped, then start PunchInOut."
+Write-Host "Installed. In services.msc, configure the Log On account if your VPN is user-scoped, then start WFMicros."

@@ -47,7 +47,7 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 [System.IO.Compression.ZipFile]::CreateFromDirectory($stage, $zip)
 dotnet publish packaging/PunchService.csproj -c Release -o dist
 Check-Exit "EXE publishing failed"
-& .\dist\PunchService.exe self-test
+& .\dist\WFMicros.exe self-test
 Check-Exit "Packaged EXE self-test failed"
-(Get-FileHash .\dist\PunchService.exe -Algorithm SHA256).Hash | Set-Content dist\PunchService.exe.sha256
-Write-Host "Created dist\PunchService.exe"
+(Get-FileHash .\dist\WFMicros.exe -Algorithm SHA256).Hash | Set-Content dist\WFMicros.exe.sha256
+Write-Host "Created dist\WFMicros.exe"

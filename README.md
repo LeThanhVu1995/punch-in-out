@@ -1,16 +1,16 @@
-# Punch In Out — Windows Service
+# WFMicros — Windows Service
 
 Single Windows x64 EXE with Node.js, Playwright, Chromium and WinSW.
 VPN stays under the machine/user's control. The computer must remain awake and connected.
 
 ## Download / first install
 GitHub Actions > latest successful **Build Windows EXE** run > Artifacts >
-**PunchService-windows-x64**. Extract PunchService.exe into a permanent directory.
+**WFMicros-windows-x64**. Extract WFMicros.exe into a permanent directory.
 The EXE extracts its bundled runtime into .runtime/ on first use; retain that directory.
 
 Open PowerShell as Administrator:
 ```powershell
-.\PunchService.exe init
+.\WFMicros.exe init
 ```
 Fill config.json URLs/selectors and accounts.local.json:
 ```json
@@ -18,19 +18,19 @@ Fill config.json URLs/selectors and accounts.local.json:
 ```
 Then:
 ```powershell
-.\PunchService.exe install
-.\PunchService.exe start
-.\PunchService.exe dashboard
+.\WFMicros.exe install
+.\WFMicros.exe start
+.\WFMicros.exe dashboard
 ```
 No separate Node.js, browser or .NET installation is required on the target machine.
 Install automatically encrypts account passwords before the worker starts.
-Use services.msc > Punch In Out > Log On if the preconnected VPN requires a particular Windows account.
+Use services.msc > WFMicros > Log On if the preconnected VPN requires a particular Windows account.
 After changing Log On, run protect-accounts as Administrator to refresh account-file permissions.
 
 ## Upgrade / manage any older build
 Run the NEW EXE as Administrator:
 ```powershell
-.\PunchService.exe upgrade
+.\WFMicros.exe upgrade
 ```
 It finds the existing registered service and its data directory, stops it, extracts the new runtime,
 updates the existing service path and preserves its Windows Log On account. A previously running
@@ -39,12 +39,12 @@ You may run the new EXE from a download folder: it copies itself to the existing
 install also upgrades an existing service. No manual uninstall/state deletion is needed.
 
 ```powershell
-.\PunchService.exe status
-.\PunchService.exe stop
-.\PunchService.exe start
-.\PunchService.exe restart
-.\PunchService.exe uninstall
-.\PunchService.exe protect-accounts
+.\WFMicros.exe status
+.\WFMicros.exe stop
+.\WFMicros.exe start
+.\WFMicros.exe restart
+.\WFMicros.exe uninstall
+.\WFMicros.exe protect-accounts
 ```
 Management commands find the registered service independently of which EXE build you use.
 run is a LIVE foreground worker; never use it alongside the service/Actions for the same accounts.
@@ -155,3 +155,5 @@ The **Lịch sử** tab has its own Hôm nay / Hôm qua / 7 ngày shortcuts, fro
 account search, review-needed filter and one row per account/day with IN and OUT side by side.
 Each cell shows scheduled/actual start times and status. Open details for per-attempt times/reasons/logs.
 Manual retry is available for today only and still requires confirmation for ambiguous/completed clicks.
+
+The Windows Services display name is **WFMicros**. The internal service ID remains `PunchInOut` for compatibility with existing installations and service-account permissions. Run `WFMicros.exe upgrade` as Administrator to update the existing installation without uninstalling; settings, accounts and history are retained.

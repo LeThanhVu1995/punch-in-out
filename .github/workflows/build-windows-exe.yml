@@ -34,7 +34,7 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           function Check-Exit($message) { if ($LASTEXITCODE -ne 0) { throw $message } }
-          $exe = Join-Path (Get-Location) "dist/PunchService.exe"
+          $exe = Join-Path (Get-Location) "dist/WFMicros.exe"
           & $exe init
           Check-Exit "Init failed"
           $config = Get-Content dist/config.json -Raw | ConvertFrom-Json
@@ -50,6 +50,10 @@ jobs:
             & $exe install
             Check-Exit "Install failed"
             if ((Get-Content dist/accounts.local.json -Raw).Contains("fixture-not-real")) { throw "Plaintext password retained" }
+            if ((Get-CimInstance Win32_Service -Filter "Name='PunchInOut'").DisplayName -ne "WFMicros") { throw "Service display name incorrect" }
+            # Simulate the old release's display name, then verify upgrade renames it.
+            sc.exe config PunchInOut DisplayName= "Punch In Out"
+            Check-Exit "Legacy display name setup failed"
             $identityBefore = (Get-CimInstance Win32_Service -Filter "Name='PunchInOut'").StartName
             & $exe start
             Check-Exit "Start failed"
@@ -63,10 +67,11 @@ jobs:
             if (!$status.credentialsProtected) { throw "Credentials not protected" }
             if ($status.jobs.Where({$_.attempts -gt 0}).Count -gt 0) { throw "Unexpected attendance attempt" }
             New-Item build/relocated -ItemType Directory -Force | Out-Null
-            Copy-Item $exe build/relocated/PunchService.exe
-            $relocated = Join-Path (Get-Location) "build/relocated/PunchService.exe"
+            Copy-Item $exe build/relocated/WFMicros.exe
+            $relocated = Join-Path (Get-Location) "build/relocated/WFMicros.exe"
             & $relocated upgrade
             Check-Exit "Upgrade failed"
+            if ((Get-CimInstance Win32_Service -Filter "Name='PunchInOut'").DisplayName -ne "WFMicros") { throw "Upgrade did not rename service" }
             $status = Wait-Dashboard
             if ((Get-CimInstance Win32_Service -Filter "Name='PunchInOut'").StartName -ne $identityBefore) { throw "Log On account changed" }
             if (!(Test-Path dist/data/state.json)) { throw "State not preserved" }
@@ -80,10 +85,10 @@ jobs:
           }
       - uses: actions/upload-artifact@v4
         with:
-          name: PunchService-windows-x64
+          name: WFMicros-windows-x64
           path: |
-            dist/PunchService.exe
-            dist/PunchService.exe.sha256
+            dist/WFMicros.exe
+            dist/WFMicros.exe.sha256
           retention-days: 30
 
       - name: Upload dashboard UI previews
