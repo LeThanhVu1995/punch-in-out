@@ -56,7 +56,7 @@ jobs:
               throw "TCP 1723 could not be reached from this runner. Check VPN endpoint, upstream firewall and server IP restrictions before attempting authentication."
             }
             Start-Service RasMan
-            Add-VpnConnection -Name $profile -ServerAddress $env:VPN_SERVER -TunnelType Pptp -AuthenticationMethod MSChapv2 -EncryptionLevel Required -SplitTunneling -Force | Out-Null
+            Add-VpnConnection -Name $profile -ServerAddress $env:VPN_SERVER -TunnelType Pptp -AuthenticationMethod MSChapv2 -EncryptionLevel Optional -SplitTunneling -Force | Out-Null
             # One authentication attempt only; no password, server or raw RAS text is printed.
             $rasOutput = & rasdial.exe $profile $env:VPN_USER $env:VPN_PASSWORD 2>&1
             $rasCode = $LASTEXITCODE
