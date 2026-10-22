@@ -49,6 +49,11 @@ internal static class CredentialProtection
         var rows=JsonNode.Parse(File.ReadAllText(file))?.AsArray() ?? throw new Exception("Accounts must be an array.");
         foreach(var row in rows)
         {
+            if(row?["username"] is JsonValue username)
+            {
+                row["usernameProtected"]=Protect(username.GetValue<string>());
+                row.AsObject().Remove("username");
+            }
             if(row?["password"] is JsonValue password)
             {
                 row["passwordProtected"]=Protect(password.GetValue<string>());
@@ -57,6 +62,6 @@ internal static class CredentialProtection
         }
         var temp=file+".protected.tmp";
         File.WriteAllText(temp,rows.ToJsonString(new System.Text.Json.JsonSerializerOptions {WriteIndented=true}));
-        LockFile(temp);File.Move(temp,file,true);Console.WriteLine("Account passwords protected with Windows DPAPI.");
+        LockFile(temp);File.Move(temp,file,true);Console.WriteLine("Account usernames and passwords protected with Windows DPAPI.");
     }
 }

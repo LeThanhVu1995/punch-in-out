@@ -6,11 +6,12 @@ function helper(command,input="",file){
  if(result.error || result.status!==0)throw new Error("Windows credential operation failed; check service account and file permissions.");
  return command==="credential-unprotect"?result.stdout:result.stdout.trimEnd();
 }
-function rawAccounts(file){
+function rawAccounts(file,unprotect=value=>helper("credential-unprotect",value)){
  const data=JSON.parse(fs.readFileSync(file,"utf8"));
  if(!Array.isArray(data))throw new Error("Accounts file must be a JSON array");
  const names=new Set();
  for(const a of data){
+  if(a.usernameProtected)a.username=unprotect(a.usernameProtected);
   if(typeof a.username!=="string" || !a.username.trim() || a.username.length>120 || names.has(a.username))
    throw new Error("Account usernames must be unique, non-empty strings");
   names.add(a.username);
@@ -27,7 +28,7 @@ function loadAccounts(file){
  cache={key,accounts};return accounts;
 }
 function protectedAccounts(accounts,protect=value=>helper("credential-protect",value)){
- return accounts.map(a=>({username:a.username,enabled:a.enabled!==false,passwordProtected:
+ return accounts.map(a=>({usernameProtected:protect(a.username),enabled:a.enabled!==false,passwordProtected:
   a.passwordProtected && !a.password?a.passwordProtected:protect(a.password)}));
 }
 function writeAccounts(file,accounts){

@@ -157,3 +157,5 @@ Each cell shows scheduled/actual start times and status. Open details for per-at
 Manual retry is available for today only and still requires confirmation for ambiguous/completed clicks.
 
 The Windows Services display name is **WFMicros**. The internal service ID remains `PunchInOut` for compatibility with existing installations and service-account permissions. Run `WFMicros.exe upgrade` as Administrator to update the existing installation without uninstalling; settings, accounts and history are retained.
+
+Account protection now encrypts both `username` and `password` using Windows DPAPI, storing only `usernameProtected` and `passwordProtected` in the accounts file. Existing plaintext or password-only protected files are migrated by `install`, `upgrade` or `protect-accounts`. Use the dashboard account editor to maintain protected accounts. Usernames remain visible in the local dashboard, attendance history, state and holiday configuration; this change protects the accounts file only. Windows administrators can still decrypt data on the same machine.

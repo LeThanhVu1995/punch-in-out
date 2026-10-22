@@ -50,6 +50,12 @@ jobs:
             & $exe install
             Check-Exit "Install failed"
             if ((Get-Content dist/accounts.local.json -Raw).Contains("fixture-not-real")) { throw "Plaintext password retained" }
+            $protectedAccount = @(Get-Content dist/accounts.local.json -Raw | ConvertFrom-Json)[0]
+            if ($protectedAccount.PSObject.Properties.Name -contains "username") { throw "Plaintext username retained" }
+            if (!$protectedAccount.usernameProtected) { throw "Username was not protected" }
+            # A second migration must preserve already encrypted values.
+            & $exe protect-accounts
+            Check-Exit "Repeated account protection failed"
             if ((Get-CimInstance Win32_Service -Filter "Name='PunchInOut'").DisplayName -ne "WFMicros") { throw "Service display name incorrect" }
             # Simulate the old release's display name, then verify upgrade renames it.
             sc.exe config PunchInOut DisplayName= "Punch In Out"

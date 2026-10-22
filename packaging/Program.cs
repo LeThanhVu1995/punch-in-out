@@ -112,7 +112,10 @@ internal static class Program
                 if(accounts.RootElement.GetArrayLength()==0)throw new Exception("Add at least one account.");
                 foreach(var account in accounts.RootElement.EnumerateArray())
                 {
-                    if(string.IsNullOrWhiteSpace(account.GetProperty("username").GetString()))throw new Exception("Account username is empty.");
+                    string? username=account.TryGetProperty("usernameProtected",out var sealedUsername)
+                        ?CredentialProtection.Unprotect(sealedUsername.GetString()!)
+                        :account.TryGetProperty("username",out var plainUsername)?plainUsername.GetString():null;
+                    if(string.IsNullOrWhiteSpace(username))throw new Exception("Account username is empty.");
                     if(account.TryGetProperty("passwordProtected",out var encrypted))CredentialProtection.Unprotect(encrypted.GetString()!);
                     else if(!account.TryGetProperty("password",out var plain)||string.IsNullOrEmpty(plain.GetString()))throw new Exception("Account password missing.");
                 }
