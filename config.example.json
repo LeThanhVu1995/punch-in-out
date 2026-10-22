@@ -43,5 +43,8 @@
   "verification": {
     "mode": "none",
     "timeoutMs": 15000
+  },
+  "diagnostics": {
+    "enabled": false
   }
 }

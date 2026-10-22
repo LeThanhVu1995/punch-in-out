@@ -104,3 +104,28 @@ test("mixed legacy and sealed usernames decode before validation and settings ed
   assert.throws(()=>rawAccounts(file,()=>"duplicate"),/unique/);
  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
+
+test("state storage migrates legacy plaintext, preserves duplicate prevention and skips unchanged writes",()=>{
+ const {readState,stateWriter,purgeDiagnostics}=require("../service/storage");
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),"punch-state-")),file=path.join(root,"state.json");
+ try{
+  const state={'fixture-key':{username:"fixture-private-user",status:"unknown",attempts:1}};
+  fs.writeFileSync(file,JSON.stringify(state));
+  assert.deepEqual(readState(file),state);
+  const save=stateWriter(file);save(state);
+  assert.deepEqual(readState(file),state);
+  const first=fs.readFileSync(file,"utf8");save(state);
+  assert.equal(fs.readFileSync(file,"utf8"),first);
+  if(process.platform==="win32" && process.env.PUNCH_HELPER_EXE){
+   assert.ok(!first.includes("fixture-private-user"));
+   assert.ok(JSON.parse(first).stateProtected);
+  }
+  fs.mkdirSync(path.join(root,"data/runs/legacy"),{recursive:true});
+  fs.writeFileSync(path.join(root,"data/runs/legacy/debug.html"),"private fixture");
+  fs.writeFileSync(path.join(root,"data/history.jsonl"),"private fixture");
+  purgeDiagnostics(root);
+  assert.equal(fs.existsSync(path.join(root,"data/runs")),false);
+  assert.equal(fs.existsSync(path.join(root,"data/history.jsonl")),false);
+  assert.deepEqual(readState(file),state);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+});

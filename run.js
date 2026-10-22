@@ -4,7 +4,13 @@ const path = require("path");
 const {loadAccounts} = require("./service/accounts");
 const {prepareVerification} = require("./service/verification");
 
+const diagnostics=process.env.PUNCH_DIAGNOSTICS==="1";
+const log=(...args)=>{if(diagnostics)console.log(...args);};
+const logError=(...args)=>{if(diagnostics)console.error(...args);};
+async function screenshot(page,options){if(diagnostics)return page.screenshot(options);}
 function progress(phase, details = {}) {
+  if(!diagnostics)details={verification:details.verification?{verified:!!details.verification.verified}:undefined,
+    reason:details.reason?"Attendance attempt could not be verified; check connectivity and account settings.":undefined};
   if (!process.env.ATTEMPT_PROGRESS_FILE) return;
   const file = process.env.ATTEMPT_PROGRESS_FILE;
   fs.writeFileSync(file + ".tmp", JSON.stringify({phase, ...details, at:new Date().toISOString()}));
@@ -148,17 +154,17 @@ function clampDelayCfg(cfg) {
   const results = [];
 
   try {
-    console.log("MODE =", MODE);
-    console.log("Accounts =", targets.length);
-    console.log("TIMEZONE =", timeZone);
-    console.log("TODAY =", today);
-    console.log("SKIP_WEEKENDS =", skipWeekends);
-    console.log("DELAY =", delayCfg);
+    log("MODE =", MODE);
+    log("Accounts =", targets.length);
+    log("TIMEZONE =", timeZone);
+    log("TODAY =", today);
+    log("SKIP_WEEKENDS =", skipWeekends);
+    log("DELAY =", delayCfg);
 
     // ✅ Random start delay
     if (delayCfg.startMax > 0 && delayCfg.startMax >= delayCfg.startMin) {
       const s = randInt(delayCfg.startMin, delayCfg.startMax);
-      console.log(`Start delay: ${s}s`);
+      log(`Start delay: ${s}s`);
       await sleep(s * 1000);
     }
 
@@ -175,20 +181,20 @@ function clampDelayCfg(cfg) {
 
       // ✅ Skip rules
       if (skipWeekends && weekend) {
-        console.log(`⏭️  Skip ${username}: weekend (${today})`);
+        log(`⏭️  Skip ${username}: weekend (${today})`);
         results.push({ user: userTag, ok: true, skipped: true, reason: "weekend", date: today });
         continue;
       }
 
       if (globalOff.includes(today)) {
-        console.log(`⏭️  Skip ${username}: global off day (${today})`);
+        log(`⏭️  Skip ${username}: global off day (${today})`);
         results.push({ user: userTag, ok: true, skipped: true, reason: "global_off", date: today });
         continue;
       }
 
       const userOffList = usersOff[username] || usersOff[userTag] || [];
       if (Array.isArray(userOffList) && userOffList.includes(today)) {
-        console.log(`⏭️  Skip ${username}: user off day (${today})`);
+        log(`⏭️  Skip ${username}: user off day (${today})`);
         results.push({ user: userTag, ok: true, skipped: true, reason: "user_off", date: today });
         continue;
       }
@@ -201,7 +207,7 @@ function clampDelayCfg(cfg) {
       let phase = "before_click";
       try {
         await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded" });
-        await page.screenshot({ path: `01-login-${MODE}-${userTag}.png`, fullPage: true });
+        await screenshot(page,{ path: `01-login-${MODE}-${userTag}.png`, fullPage: true });
 
         async function fillSmart(selector, value, label) {
           const loc = page.locator(selector).first();
@@ -221,7 +227,7 @@ function clampDelayCfg(cfg) {
             } catch {}
           }
 
-          await page.screenshot({ path: `02-missing-${label}-${MODE}-${userTag}.png`, fullPage: true });
+          await screenshot(page,{ path: `02-missing-${label}-${MODE}-${userTag}.png`, fullPage: true });
           throw new Error(`Cannot find visible ${label} with selector: ${selector}`);
         }
 
@@ -229,10 +235,10 @@ function clampDelayCfg(cfg) {
         await fillSmart(PASSWORD_SELECTOR, password, "password");
 
         await Promise.all([page.waitForLoadState("networkidle"), page.click(SUBMIT_SELECTOR)]);
-        await page.screenshot({ path: `03-after-login-${MODE}-${userTag}.png`, fullPage: true });
+        await screenshot(page,{ path: `03-after-login-${MODE}-${userTag}.png`, fullPage: true });
 
         await page.goto(TARGET_URL, { waitUntil: "networkidle" });
-        await page.screenshot({ path: `04-target-${MODE}-${userTag}.png`, fullPage: true });
+        await screenshot(page,{ path: `04-target-${MODE}-${userTag}.png`, fullPage: true });
 
         // Resolve visibility/actionability before committing to a potentially non-idempotent click.
         await page.locator(buttonSelector).click({ trial: true });
@@ -244,17 +250,19 @@ function clampDelayCfg(cfg) {
         });
         phase=verification.verified?"verified":"clicked";
         progress(phase,{verification,reason:verification.reason});
-        await page.screenshot({ path: `05-after-click-${MODE}-${userTag}.png`, fullPage: true }).catch(()=>{});
-        console.log(`${userTag}: ${MODE} ${phase}`);
+        await screenshot(page,{ path: `05-after-click-${MODE}-${userTag}.png`, fullPage: true }).catch(()=>{});
+        log(`${userTag}: ${MODE} ${phase}`);
         results.push({user:userTag,ok:true,verified:verification.verified,verification});
       } catch (e) {
         const safeError=String(e).split(password).join("[REDACTED]");
         progress(phase,{reason:safeError});
-        console.error(`❌ ${userTag}:`, safeError);
+        logError(`❌ ${userTag}:`, safeError);
 
-        const html = await page.content().catch(() => "");
-        fs.writeFileSync(`debug-${MODE}-${userTag}.html`, html || "");
-        await page.screenshot({ path: `error-${MODE}-${userTag}.png`, fullPage: true }).catch(()=>{});
+        if(diagnostics){
+          const html = await page.content().catch(() => "");
+          fs.writeFileSync(`debug-${MODE}-${userTag}.html`, html || "");
+        }
+        await screenshot(page,{ path: `error-${MODE}-${userTag}.png`, fullPage: true }).catch(()=>{});
 
         results.push({ user: userTag, ok: false, error: safeError });
       } finally {
@@ -268,15 +276,15 @@ function clampDelayCfg(cfg) {
         delayCfg.betweenMax >= delayCfg.betweenMin
       ) {
         const s = randInt(delayCfg.betweenMin, delayCfg.betweenMax);
-        console.log(`Between-users delay: ${s}s`);
+        log(`Between-users delay: ${s}s`);
         await sleep(s * 1000);
       }
     }
 
-    fs.writeFileSync("results.json", JSON.stringify(results, null, 2), "utf-8");
+    if(diagnostics)fs.writeFileSync("results.json", JSON.stringify(results, null, 2), "utf-8");
     if (results.some(result => !result.ok)) process.exitCode = 1;
-    console.log("Saved results.json");
+    log("Saved results.json");
   } finally {
     await browser.close();
   }
-})().catch(error=>{console.error("Runner failed:",error.message);process.exitCode=1;});
+})().catch(error=>{logError("Runner failed:",error.message);process.exitCode=1;});

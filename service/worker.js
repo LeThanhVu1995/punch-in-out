@@ -8,6 +8,9 @@ const {retryConfig, readProgress, complete} = require("./retry");
 const {loadAccounts}=require("./accounts");
 const {checkConnectivity}=require("./connectivity");
 const {record}=require("./history");
+const {localTime}=require("./schedule");
+const {readState,stateWriter,purgeDiagnostics}=require("./storage");
+const {randomUUID}=require("crypto");
 const codeRoot = path.resolve(__dirname, "..");
 const root = process.env.PUNCH_ROOT ? path.resolve(process.env.PUNCH_ROOT) : codeRoot;
 const configPath = path.resolve(root, process.env.PUNCH_CONFIG || "config.json");
@@ -29,11 +32,9 @@ try {
 }
 const read = file => JSON.parse(fs.readFileSync(file, "utf8"));
 const stateFile = path.join(dataDir, "state.json");
-const state = fs.existsSync(stateFile) ? read(stateFile) : {};
-function save() {
-  fs.writeFileSync(stateFile + ".tmp", JSON.stringify(state,null,2));
-  fs.renameSync(stateFile + ".tmp", stateFile);
-}
+const state = readState(stateFile);
+const writeState=stateWriter(stateFile);
+function save(){writeState(state);}
 let stopping = false, active, dashboard, wakeResolve, wakeRequested = false;
 function wake() { wakeRequested = true; if(wakeResolve)wakeResolve(); }
 async function pause(seconds) {
@@ -51,14 +52,17 @@ retryConfig(initialConfig);
 for (const job of Object.values(state)) if (job.status === "running") {
   const progress = job.progressFile ? readProgress(path.resolve(root,job.progressFile)) : (job.phase?{phase:job.phase}:{});
   complete(job, progress, initialConfig);
-  record(root,job,progress);
+  if(initialConfig.diagnostics?.enabled===true)record(root,job,progress);
 }
 save();
+if(initialConfig.diagnostics?.enabled!==true)purgeDiagnostics(root);
 function stop() { stopping = true; wake(); if (active) active.kill(); }
 process.on("SIGTERM", stop); process.on("SIGINT", stop);
 async function runJob(job, config) {
-    const folder = path.join(dataDir,"runs",job.date,
-      Buffer.from(job.username).toString("hex") + "-" + job.mode, "attempt-" + job.attempts);
+    const diagnostics=config.diagnostics?.enabled===true;
+    const folder = diagnostics?path.join(dataDir,"runs",job.date,
+      Buffer.from(job.username).toString("hex") + "-" + job.mode, "attempt-" + job.attempts)
+      :path.join(dataDir,"runs",randomUUID());
     fs.mkdirSync(folder,{recursive:true});
     const progressFile = path.join(folder,"progress.json");
     job.progressFile = path.relative(root,progressFile);
@@ -71,21 +75,22 @@ async function runJob(job, config) {
   }
   if(stopping)return {phase:"before_click",reason:"Service stopped before browser launch"};
   return new Promise(resolve => {
-    const output = fs.openSync(path.join(folder,"run.log"), "a");
+    const output = diagnostics?fs.openSync(path.join(folder,"run.log"), "a"):null;
     const emptyOff = path.join(folder,"off.json");
     fs.writeFileSync(emptyOff, JSON.stringify({timezone:config.timezone,skipWeekends:false}));
     active = spawn(process.execPath, [path.join(codeRoot,"run.js")], {
       cwd:folder, env:{...process.env,...Object.fromEntries(Object.entries(config.environment || {}).filter(([,v])=>v)),
+        PUNCH_DIAGNOSTICS:diagnostics?"1":"0",
         MODE:job.mode, ACCOUNT_USERNAME:job.username, ATTEMPT_PROGRESS_FILE:progressFile,
         PUNCH_VERIFICATION:JSON.stringify(config.verification || {mode:"none"}),
         ACCOUNTS_FILE:path.resolve(root,config.accountsFile), OFF_DAYS_FILE:emptyOff},
-      stdio:["ignore",output,output]
+      stdio:output===null?"ignore":["ignore",output,output]
     });
     let timedOut = false;
     const timer = setTimeout(() => {timedOut=true; active?.kill();},config.jobTimeoutSeconds*1000);
-    active.once("error", error => console.error("Child process failed:",error.message));
+    active.once("error", () => {});
     active.once("close", code => {
-      clearTimeout(timer); fs.closeSync(output); active=undefined;
+      clearTimeout(timer); if(output!==null)fs.closeSync(output); active=undefined;
       job.lastExitCode = code;
       job.timedOut = timedOut;
       resolve(readProgress(progressFile));
@@ -111,10 +116,14 @@ function settings() {
 
 (async () => {
   try {
-    console.log("Punch service started. VPN is managed externally.");
+    
     dashboard=await startDashboard({root,configPath,state,save,settings,stopping:()=>stopping,wake});
     while (!stopping) {
       const {config,accounts,off} = settings();
+      if(config.diagnostics?.enabled!==true){
+        const today=localTime(new Date(),config.timezone).date;
+        for(const [key,job] of Object.entries(state))if(job.date!==today && job.status!=="running")delete state[key];
+      }
       const jobs = dueJobs(config,off,accounts,state);
       save();
       for (const {job} of jobs) {
@@ -129,9 +138,12 @@ function settings() {
         job.status="running"; job.startedAt=new Date().toISOString(); save();
         const progress = await runJob(job,config);
         complete(job,progress,config);
+        if(config.diagnostics?.enabled!==true && job.progressFile){
+          fs.rmSync(path.dirname(path.resolve(root,job.progressFile)),{recursive:true,force:true});
+          delete job.progressFile;
+        }
         save();
-        record(root,job,progress);
-        console.log(job.date,job.mode,job.username,job.status);
+        if(config.diagnostics?.enabled===true)record(root,job,progress);
       }
       await pause(config.pollSeconds);
     }
@@ -139,4 +151,4 @@ function settings() {
     if(dashboard){dashboard.closeAllConnections();await new Promise(resolve=>dashboard.close(resolve));}
     fs.unlinkSync(lock);
   }
-})().catch(error=>{console.error(error.message);process.exitCode=1;});
+})().catch(error=>{console.error("Service stopped because of an internal error.");process.exitCode=1;});

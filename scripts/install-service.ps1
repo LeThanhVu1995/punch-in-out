@@ -28,7 +28,7 @@ $nodeXml = [System.Security.SecurityElement]::Escape($node)
   <env name="PLAYWRIGHT_BROWSERS_PATH" value="%BASE%\browsers"/>
   <startmode>Automatic</startmode>
   <logpath>%BASE%\logs</logpath>
-  <log mode="roll"/>
+  <log mode="none"/>
   <onfailure action="restart" delay="30 sec"/>
   <stoptimeout>20 sec</stoptimeout>
 </service>

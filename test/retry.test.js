@@ -41,7 +41,7 @@ test("retry time persists and expired window prevents further attempts",()=>{
   assert.equal(restored[key].status,"missed");
 });
 
-test("worker retries failing account independently, persists evidence and recovers on restart", {timeout:20000}, async()=>{
+for(const diagnostics of [false,true])test("worker retries and recovers on restart (diagnostics="+diagnostics+")", {timeout:20000}, async()=>{
   const fs=require("node:fs"), os=require("node:os"), path=require("node:path");
   const {spawn}=require("node:child_process");
   const folder=fs.mkdtempSync(path.join(os.tmpdir(),"punch-retry-"));
@@ -56,7 +56,7 @@ test("worker retries failing account independently, persists evidence and recove
     'process.exit(process.env.ACCOUNT_USERNAME==="good"?0:1);'
   ].join("\n"));
   const now=new Date(), date=now.toISOString().slice(0,10);
-  const config={preflight:{enabled:false},dashboard:{enabled:false},timezone:"UTC",weekdays:[0,1,2,3,4,5,6],
+  const config={diagnostics:{enabled:diagnostics},preflight:{enabled:false},dashboard:{enabled:false},timezone:"UTC",weekdays:[0,1,2,3,4,5,6],
     windows:{IN:{from:"00:00",to:"23:59"},OUT:{from:"00:00",to:"23:59"}},
     accountsFile:"accounts.json",offDaysFile:"off.json",pollSeconds:1,jobTimeoutSeconds:5,retryDelaySeconds:1,
     environment:Object.fromEntries(["LOGIN_URL","TARGET_URL","USERNAME_SELECTOR","PASSWORD_SELECTOR","SUBMIT_SELECTOR","BUTTON_IN_SELECTOR","BUTTON_OUT_SELECTOR"].map(k=>[k,"unused"]))};
@@ -78,7 +78,7 @@ test("worker retries failing account independently, persists evidence and recove
   }
   async function waitFor(predicate){
     for(let n=0;n<100;n++){
-      const current=JSON.parse(fs.readFileSync(stateFile,"utf8"));
+      const current=require("../service/storage").readState(stateFile);
       if(predicate(current))return current;
       if(child.exitCode!==null)throw new Error("worker stopped unexpectedly: "+workerOutput);
       await new Promise(r=>setTimeout(r,100));
@@ -97,7 +97,15 @@ test("worker retries failing account independently, persists evidence and recove
     assert.equal(final[JSON.stringify([date,"good","IN"])].attempts,1);
     assert.equal(final[JSON.stringify([date,"ambiguous","IN"])].status,"unknown");
     assert.equal(final[JSON.stringify([date,"ambiguous","IN"])].attempts,1);
-    assert.ok(fs.existsSync(path.join(folder,"data/runs",date,Buffer.from("bad").toString("hex")+"-IN","attempt-4","progress.json")));
+    if(diagnostics)assert.ok(fs.existsSync(path.join(folder,"data/runs",date,Buffer.from("bad").toString("hex")+"-IN","attempt-4","progress.json")));
+    else{
+      assert.equal(fs.existsSync(path.join(folder,"data/history.jsonl")),false);
+      assert.equal(fs.readdirSync(path.join(folder,"data/runs")).length,0);
+      if(process.platform==="win32" && process.env.PUNCH_HELPER_EXE){
+        assert.ok(JSON.parse(fs.readFileSync(stateFile,"utf8")).stateProtected);
+        assert.ok(!fs.readFileSync(stateFile,"utf8").includes('"username"'));
+      }
+    }
   }finally{
     if(child && child.exitCode===null)await stop();
     fs.rmSync(folder,{recursive:true,force:true});

@@ -139,6 +139,9 @@ internal static class Program
                 if(!Path.GetFullPath(Environment.ProcessPath!).Equals(Path.GetFullPath(launcher),StringComparison.OrdinalIgnoreCase))
                     File.Copy(Environment.ProcessPath!,launcher,true);
                 Directory.CreateDirectory(Path.Combine(home,"logs"));
+                foreach(var log in Directory.EnumerateFiles(Path.Combine(home,"logs")))
+                    if(Path.GetFileName(log).Contains(".log",StringComparison.OrdinalIgnoreCase))
+                        try{File.Delete(log);}catch(IOException){Console.WriteLine("An old service log is still in use; remove it after stopping the service.");}
                 string xml=$"""
                 <service>
                   <id>PunchInOut</id><name>WFMicros</name>
@@ -150,7 +153,7 @@ internal static class Program
                   <env name="PUNCH_HELPER_EXE" value="{Xml(launcher)}"/>
                   <env name="PLAYWRIGHT_BROWSERS_PATH" value="{Xml(Path.Combine(runtime,"browsers"))}"/>
                   <startmode>Automatic</startmode>
-                  <logpath>{Xml(Path.Combine(home,"logs"))}</logpath><log mode="roll"/>
+                  <logpath>{Xml(Path.Combine(home,"logs"))}</logpath><log mode="none"/>
                   <onfailure action="restart" delay="30 sec"/><stoptimeout>20 sec</stoptimeout>
                 </service>
                 """;
