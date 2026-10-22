@@ -8,7 +8,7 @@ function record(root,job,progress){
   phase:progress.phase,reason:progress.reason,verification:progress.verification,connection:job.connection};
  fs.appendFileSync(file,JSON.stringify(row)+"\n",{mode:0o600});
 }
-function readHistory(root,state,date){
+function readHistory(root,state,date,limit=2000){
  const file=path.join(root,"data","history.jsonl"),rows=[];
  if(fs.existsSync(file)){
   const fd=fs.openSync(file,"r");
@@ -31,6 +31,6 @@ function readHistory(root,state,date){
     attempt:job.attempts,startedAt:job.startedAt,finishedAt:job.finishedAt,progressFile:job.progressFile,legacy:true});
   }
  }
- return rows.sort((a,b)=>(b.startedAt || "").localeCompare(a.startedAt || "")).slice(0,2000);
+ return rows.sort((a,b)=>(b.startedAt || "").localeCompare(a.startedAt || "")).slice(0,limit);
 }
 module.exports={record,readHistory};

@@ -1,5 +1,7 @@
 const http=require("http"),fs=require("fs"),path=require("path"),crypto=require("crypto");
 const {localTime}=require("./schedule"),{enqueue}=require("./manual");
+const {leaveSnapshot,updateLeave}=require("./leave");
+const {historyReport}=require("./history-report");
 const {readHistory}=require("./history"),{checkConnectivity}=require("./connectivity");
 const {validDate,editorSnapshot,updateConfig,updateHolidays,updateAccounts}=require("./configuration");
 function startDashboard({root,configPath=path.join(root,"config.json"),state,save,settings,stopping,wake}) {
@@ -51,10 +53,12 @@ function startDashboard({root,configPath=path.join(root,"config.json"),state,sav
    const url=new URL(req.url,"http://"+req.headers.host);
    if(req.method==="GET" && assets[url.pathname])return send(res,200,fs.readFileSync(path.join(__dirname,assets[url.pathname]),"utf8"),url.pathname.endsWith(".js")?"text/javascript":"text/html");
    if(req.method==="GET" && url.pathname==="/api/status")return send(res,200,snapshot(url));
+   if(req.method==="GET" && url.pathname==="/api/leave"){const {config,accounts,allAccounts=accounts}=settings();return send(res,200,leaveSnapshot(root,config,allAccounts));}
    if(req.method==="GET" && url.pathname==="/api/editor")return send(res,200,editorSnapshot(root,configPath));
    if(req.method==="GET" && url.pathname==="/api/history"){
     const {config,accounts,allAccounts=accounts}=settings(),date=dateFor(url,config);
-    return send(res,200,{date,rows:redact(readHistory(root,state,date),allAccounts)});
+    const from=url.searchParams.get("from") || date,to=url.searchParams.get("to") || from;
+    return send(res,200,{date,...redact(historyReport(root,state,from,to,url.searchParams.get("username")),allAccounts)});
    }
    if(req.method==="GET" && url.pathname==="/api/log"){
     const {config,accounts,allAccounts=accounts}=settings(),date=dateFor(url,config);
@@ -88,6 +92,7 @@ function startDashboard({root,configPath=path.join(root,"config.json"),state,sav
     }
     if(url.pathname==="/api/check"){connection=await checkConnectivity(config);return send(res,200,connection);}
     if(url.pathname==="/api/config"){const result=updateConfig(root,configPath,body);wake();return send(res,200,{...result,note:"Existing daily random times are preserved; new windows apply immediately as limits and to future schedules."});}
+    if(url.pathname==="/api/leave"){const {allAccounts=accounts}=settings();const result=updateLeave(root,config,allAccounts,body);wake();return send(res,200,result);}
     if(url.pathname==="/api/holidays"){const result=updateHolidays(root,configPath,body);wake();return send(res,200,result);}
     if(url.pathname==="/api/accounts"){const result=updateAccounts(root,configPath,body);wake();return send(res,200,result);}
    }

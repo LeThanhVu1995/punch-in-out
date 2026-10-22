@@ -33,12 +33,61 @@ process.env.PLAYWRIGHT_BROWSERS_PATH = path.resolve(__dirname, "../browsers");
     await page.fill("#edit-maxRetries","2");await page.click("#save-config");
     await page.waitForFunction(()=>document.querySelector("#message").textContent.includes("Đã lưu cấu hình"));
     assert.equal(JSON.parse(fs.readFileSync(path.join(root,"config.json"),"utf8")).maxRetries,2);
-    await page.fill("#global-holidays","2026-12-25");await page.click("#save-holidays");
-    await page.waitForFunction(()=>document.querySelector("#message").textContent.includes("Đã lưu ngày nghỉ"));
+
+    const today=new Intl.DateTimeFormat("en-CA",{timeZone:config.timezone}).format(new Date());
+    const dayPlus=(date,n)=>new Date(Date.parse(date+"T00:00:00Z")+n*86400000).toISOString().slice(0,10);
+    await page.click("#tab-leave");
+    await page.waitForSelector(".calendar-day");
+    await page.click("#new-leave");
+    await page.fill("#leave-from",dayPlus(today,2));await page.fill("#leave-to",dayPlus(today,4));
+    await page.fill("#leave-note","Nghỉ chung theo kế hoạch");
+    await page.click("#leave-save");
+    await page.waitForFunction(()=>document.querySelector("#message").textContent.includes("Đã đăng ký nghỉ"));
+    assert.ok(JSON.parse(fs.readFileSync(path.join(root,"off.json"),"utf8")).global.includes(dayPlus(today,3)));
+    await page.click("#new-leave");
+    await page.fill("#leave-from",dayPlus(today,5));await page.fill("#leave-to",dayPlus(today,7));
+    await page.selectOption("#leave-scope","users");
+    await page.locator('#leave-user-options input[value="fixture-alpha"]').check();
+    await page.fill("#leave-note","Nghỉ phép gia đình");
+    await page.click("#leave-save");
+    await page.waitForFunction(()=>document.querySelectorAll(".leave-card").length===2);
+    const personal=page.locator(".leave-card").filter({hasText:"Nghỉ phép gia đình"});
+    await personal.getByRole("button",{name:"Sửa",exact:true}).click();
+    await page.fill("#leave-note","Nghỉ phép đã cập nhật");await page.click("#leave-save");
+    await page.waitForFunction(()=>document.querySelector("#leave-list").textContent.includes("Nghỉ phép đã cập nhật"));
+    const qa=process.env.PUNCH_QA_DIR;
+    if(qa){fs.mkdirSync(qa,{recursive:true});await page.screenshot({path:path.join(qa,"01-ngay-nghi.png"),fullPage:true});}
+    const current=JSON.parse(fs.readFileSync(path.join(root,"off.json"),"utf8"));
+    assert.equal(current.registrations.find(r=>r.scope==="users").note,"Nghỉ phép đã cập nhật");
+    page.once("dialog",dialog=>dialog.accept());
+    await page.locator(".leave-card").filter({hasText:"Nghỉ phép đã cập nhật"}).getByRole("button",{name:"Xóa",exact:true}).click();
+    await page.waitForFunction(()=>document.querySelectorAll(".leave-card").length===1);
+    assert.ok(JSON.parse(fs.readFileSync(path.join(root,"off.json"),"utf8")).global.includes(dayPlus(today,3)));
+
+    const records=[];
+    for(const [index,account]of accounts.entries())for(const mode of ["IN","OUT"]){
+      const job={date:today,username:account.username,mode,due:mode==="IN"?27000:64200,attempts:mode==="IN"?2:1,
+       status:mode==="IN"?(index?"clicked":"success"):(index?"pending":"failed"),
+       startedAt:today+(mode==="IN"?"T00:31:00Z":"T10:51:00Z"),finishedAt:today+(mode==="IN"?"T00:31:10Z":"T10:51:10Z")};
+      state[JSON.stringify([today,account.username,mode])]=job;
+      records.push({id:[today,account.username,mode,job.attempts].join("|"),...job,attempt:job.attempts,reason:job.status==="failed"?"Kết nối website bị gián đoạn":undefined});
+    }
+    fs.writeFileSync(path.join(root,"data/history.jsonl"),records.map(r=>JSON.stringify(r)).join("\n")+"\n");
     await page.click("#tab-history");await page.waitForSelector("#history:not([hidden])");
-    await page.click("#tab-monitor");
+    await page.waitForFunction(()=>document.querySelectorAll("#historyrows tr").length===2);
+    await page.click("#history-week");
+    await page.waitForFunction(()=>document.querySelector("#history-from").value!==document.querySelector("#history-to").value);
+    await page.waitForFunction(()=>document.querySelector("#historyrows").textContent.includes("fixture-alpha"));
+    if(qa)await page.screenshot({path:path.join(qa,"02-lich-su.png"),fullPage:true});
+    await page.locator("#historyrows tr").filter({hasText:"fixture-alpha"}).getByRole("button",{name:"Chi tiết"}).click();
+    await page.waitForSelector("#attempts-dialog[open]");
+    assert.ok((await page.locator("#attempts-list").textContent()).includes("OUT"));
+    if(qa)await page.screenshot({path:path.join(qa,"03-chi-tiet.png"),fullPage:true});
+    await page.click("#attempts-close");
+    await page.fill("#history-search","fixture-beta");assert.equal(await page.locator("#historyrows tr").count(),1);
     await page.setViewportSize({width:390,height:844});
-    assert.ok(await page.locator("#activate").isVisible());
+    if(qa)await page.screenshot({path:path.join(qa,"04-mobile.png"),fullPage:true});
+    await page.click("#tab-monitor");assert.ok(await page.locator("#activate").isVisible());
     const {prepareVerification}=require("../service/verification");
     const proofPage=await browser.newPage();
     await proofPage.setContent('<div id="proof">old status</div><button id="submit" onclick="document.querySelector(\'#proof\').textContent=\'Accepted today\'">Punch</button>');

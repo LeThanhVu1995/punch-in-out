@@ -34,10 +34,49 @@ textarea{font:inherit;border:1px solid #d8e1e9;border-radius:7px;padding:10px;mi
 dialog{border:1px solid #dce4ed;border-radius:12px;max-width:900px;width:90vw;padding:24px}
 dialog::backdrop{background:#102b4560}pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:60vh;overflow:auto;background:#112b40;color:#dbe9f3;padding:16px;border-radius:8px}
 @media(max-width:720px){main{padding:16px}.cards{grid-template-columns:repeat(2,1fr)}header{align-items:flex-start}.toolbar{gap:8px}th,td{padding:12px}}
+
+.section-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 20px}.section-heading h2{margin:0;font-size:24px;letter-spacing:-.5px}
+.leave-layout{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(340px,.85fr);gap:22px;align-items:start}
+.toolbar h3{margin:0;font-size:16px}.calendar-legend{display:flex;gap:18px;align-items:center;padding:18px 20px 8px;font-size:12px;color:#687c8d}
+.calendar-legend span{display:flex;align-items:center;gap:6px}.dot{display:inline-block;width:8px;height:8px;border-radius:50%}.dot.all{background:#198b7d}.dot.personal{background:#6c70ce}
+.weekdays,.calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));padding:0 16px}.weekdays{margin-top:12px}
+.weekdays span{text-align:center;padding:12px 0;color:#7a8a99;font-size:11px;font-weight:700}
+.calendar{padding-bottom:16px;gap:5px}.calendar button{border:1px solid #eef2f6;min-height:77px;padding:9px 5px;text-align:left;display:flex;flex-direction:column;gap:7px;align-items:flex-start;border-radius:9px;font-weight:500}
+.calendar button .day{font-weight:650;margin-left:4px}.calendar button .day-note{font-size:10px;line-height:1.3;border-radius:4px;padding:3px 4px;background:#f0edff;color:#6661b3}
+.calendar button.global-day{background:#eef9f6;border-color:#d8eee6}.calendar button.global-day .day-note{background:#daf1e7;color:#18785d}
+.calendar button.weekend{background:#f8fafc}.calendar button.today .day{color:#117a70;text-decoration:underline;text-underline-offset:4px}
+.calendar button.outside{opacity:.35}.calendar button.selected{outline:2px solid #238d82;outline-offset:0}.calendar button:hover{border-color:#78b7ae}
+.calendar-foot{border-top:1px solid #e8eef3;padding:16px 20px;display:flex;gap:10px;justify-content:space-between;font-size:12px;color:#6b7e8c}
+.list-search{padding:14px 18px}.list-search input{width:100%}.leave-card{padding:18px;border-top:1px solid #edf1f5}
+.leave-card h4{margin:0 0 7px;font-size:14px}.leave-card p{font-size:13px;overflow-wrap:anywhere}.leave-card .card-top{display:flex;gap:10px;justify-content:space-between;align-items:center}
+.leave-tags{display:flex;gap:5px;flex-wrap:wrap;margin:10px 0}.tag{font-size:11px;padding:4px 7px;background:#f0f3f8;color:#576f85;border-radius:5px}.tag.global{background:#e1f4ec;color:#18745b}
+.leave-actions{display:flex;gap:8px;margin-top:12px}.leave-actions button{padding:6px 10px;font-size:12px}.danger{color:#af5249}
+.empty-state{text-align:center;padding:42px 24px;color:#7b8e9e;line-height:1.8}.empty-state strong{display:block;color:#35516a;margin-bottom:6px}
+.selection-note{padding:8px 18px;color:#217d72;font-size:12px;display:flex;justify-content:space-between;align-items:center;background:#edf8f4}
+.more{margin:12px 18px;width:calc(100% - 36px)}.dialog-heading{display:flex;align-items:flex-start;gap:16px;justify-content:space-between;margin-bottom:22px}.dialog-heading h2{margin:0;font-size:22px}
+#leave-dialog{max-width:620px}.picker-toolbar{display:flex;gap:10px;margin-bottom:10px}.picker-toolbar input{flex:1;min-width:0}
+.user-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;max-height:200px;overflow:auto;border:1px solid #e3e9f0;border-radius:8px;padding:10px}
+.user-option{display:flex;align-items:center;gap:8px;padding:8px;border-radius:5px;background:#f8fafc;font-size:13px;overflow-wrap:anywhere}
+.registration-preview{margin-top:18px;padding:12px;background:#edf7f3;color:#21715e;border-radius:8px;font-size:13px}.form-error{color:#b2443c;min-height:20px;font-size:13px}
+.dialog-actions{display:flex;gap:10px;justify-content:flex-end;border-top:1px solid #edf1f5;padding-top:18px;margin-top:8px}
+.inline-field{display:flex;gap:6px;align-items:center;font-size:12px;color:#6d8194}.inline-field input{max-width:155px}
+.quick-dates{display:flex;gap:5px}.quick-dates button{font-size:12px}.quick-dates button.active{background:#e8f6f0;color:#18785e;border-color:#b9dfcf}
+.check-filter{font-size:12px;white-space:nowrap;display:flex;align-items:center;gap:5px}
+.history-summary{padding:13px 18px;background:#fafcfe;border-bottom:1px solid #e7edf3;display:flex;justify-content:space-between;gap:12px;color:#6a8093;font-size:12px}
+.paired-table tbody tr{cursor:pointer}.paired-table tbody tr:hover{background:#f8fbfd}.paired-table td{vertical-align:top}
+.job-cell{display:flex;flex-direction:column;gap:7px;min-width:190px}.job-cell .job-times{font-size:12px;color:#657c8f}
+.job-cell .badge{align-self:flex-start}.job-cell .job-error{max-width:280px;color:#ae554b;font-size:11px;white-space:normal;line-height:1.5}
+.history-user{font-weight:650}.history-date{font-size:12px;color:#8293a2;margin-top:5px}
+#attempts-dialog{max-width:900px}.paired-detail{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding-bottom:20px}.paired-detail>div{background:#f6f9fc;border:1px solid #e6edf2;border-radius:10px;padding:16px}
+.attempt-row{position:relative;margin:0 0 12px;padding:15px 18px;border:1px solid #e6edf3;border-left:3px solid #b4c7d6;border-radius:7px;display:flex;gap:12px;justify-content:space-between}
+.attempt-row h4{margin:0 0 7px;font-size:13px}.attempt-row p{font-size:12px;overflow-wrap:anywhere}.attempt-row .badge{margin-right:8px}
+#message:empty{display:none}#message:not(:empty){padding:13px 18px;border-radius:9px;background:#e4f4eb;margin:14px 0}
+@media(max-width:1000px){.leave-layout{grid-template-columns:1fr}.leave-list-panel{max-height:none}}
+@media(max-width:600px){main{padding:12px}.section-heading{align-items:flex-start}.section-heading h2{font-size:20px}.calendar,.weekdays{padding-left:8px;padding-right:8px}.calendar{gap:3px}.calendar button{min-height:65px;padding:7px 2px}.calendar button .day-note{font-size:8px}.calendar-legend{gap:10px;padding:14px 10px;font-size:10px}.calendar-foot{flex-direction:column}.paired-detail{grid-template-columns:1fr}.history-summary{flex-direction:column}.user-options{grid-template-columns:1fr}dialog{padding:18px}}
 </style></head><body><main>
 <header><div><div class="eyebrow">LOCAL SERVICE CONSOLE</div><h1>Punch Control</h1><p id="subtitle">Đang kết nối service…</p></div><span class="live" id="connection">Connecting</span></header>
-<nav class="tabs"><button id="tab-monitor" class="active">Theo dõi</button><button id="tab-history">Lịch sử</button><button id="tab-settings">Cài đặt &amp; tài khoản</button></nav>
-<section class="cards">
+<nav class="tabs"><button id="tab-monitor" class="active">Theo dõi</button><button id="tab-leave">Ngày nghỉ</button><button id="tab-history">Lịch sử</button><button id="tab-settings">Cài đặt</button></nav>
+<section class="cards" id="monitor-cards">
 <div class="card"><span>Tài khoản</span><div class="number" id="users">—</div></div>
 <div class="card"><span>Đã xác minh / chưa xác minh</span><div class="number" id="clicked">—</div></div>
 <div class="card"><span>Lỗi / cần kiểm tra</span><div class="number" id="errors">—</div></div>
@@ -51,11 +90,29 @@ dialog::backdrop{background:#102b4560}pre{white-space:pre-wrap;overflow-wrap:any
 <div class="spacer"></div><button id="refresh">Làm mới</button><button id="failed">Chạy lại lượt lỗi</button><button class="primary" id="activate">Active · Chạy tất cả ngay</button>
 </div><div class="scroll"><table><thead><tr><th>Tài khoản</th><th>Giờ hẹn</th><th>Trạng thái</th><th>Lần thử</th><th>Bắt đầu / kết thúc</th><th>Thao tác</th></tr></thead><tbody id="rows"></tbody></table></div></div>
 </section>
-<div id="message" role="status"></div>
+<div id="message" role="status" aria-live="polite"></div>
 
-<section id="history" class="panel" hidden><div class="toolbar"><h3>Lịch sử từng lần thử</h3><span class="small" id="historydate"></span><div class="spacer"></div><button id="history-refresh">Làm mới</button></div>
-<p style="padding:0 18px">Chọn ngày ở tab Theo dõi. Dữ liệu cũ trước khi nâng cấp chỉ có trạng thái cuối, có nhãn “cũ”.</p>
-<div class="scroll"><table><thead><tr><th>User / lượt</th><th>Lần</th><th>Kết quả</th><th>Bắt đầu → kết thúc</th><th>Chi tiết</th><th>Log</th></tr></thead><tbody id="historyrows"></tbody></table></div></section>
+
+<section id="leave" hidden>
+<div class="section-heading"><div><h2>Ngày nghỉ</h2><p>Chọn ngày trên lịch hoặc đăng ký một khoảng ngày cho nhiều tài khoản.</p></div><button class="primary" id="new-leave">+ Đăng ký nghỉ</button></div>
+<div class="leave-layout"><div class="panel calendar-panel">
+<div class="toolbar"><button id="month-prev" aria-label="Tháng trước">‹</button><h3 id="month-title"></h3><button id="month-next" aria-label="Tháng sau">›</button><div class="spacer"></div><button id="month-today">Tháng này</button></div>
+<div class="calendar-legend"><span><i class="dot all"></i>Nghỉ chung</span><span><i class="dot personal"></i>Nghỉ riêng</span><span class="small">Bấm ngày để đăng ký</span></div>
+<div class="weekdays"><span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span>T7</span><span>CN</span></div><div class="calendar" id="leave-calendar"></div>
+<div class="calendar-foot"><label><input type="checkbox" id="leave-weekends"> Tự bỏ qua thứ Bảy &amp; Chủ nhật</label><span class="small" id="leave-count"></span></div>
+</div><div class="panel leave-list-panel"><div class="toolbar"><h3>Đã đăng ký</h3><div class="spacer"></div><select id="leave-filter" aria-label="Lọc đăng ký nghỉ"><option value="upcoming">Sắp tới</option><option value="month">Tháng đang xem</option><option value="all">Tất cả</option></select></div>
+<div class="list-search"><input id="leave-search" placeholder="Tìm tài khoản hoặc ghi chú…" aria-label="Tìm đăng ký nghỉ"></div>
+<div id="leave-selected" class="selection-note" hidden><span id="leave-selection-label"></span><button id="leave-clear">Bỏ chọn ngày</button></div>
+<div id="leave-list"></div><button id="leave-more" class="more" hidden>Xem thêm</button></div></div>
+</section>
+<section id="history" hidden>
+<div class="section-heading"><div><h2>Lịch sử chấm công</h2><p>IN và OUT cạnh nhau. Bấm vào một dòng để xem từng lần thử.</p></div><button id="history-refresh">↻ Làm mới</button></div>
+<div class="panel"><div class="toolbar history-toolbar"><div class="quick-dates"><button id="history-today" class="active">Hôm nay</button><button id="history-yesterday">Hôm qua</button><button id="history-week">7 ngày</button></div>
+<label class="inline-field">Từ <input type="date" id="history-from"></label><label class="inline-field">Đến <input type="date" id="history-to"></label><button id="history-apply">Xem</button>
+<div class="spacer"></div><input id="history-search" placeholder="Tìm tài khoản…" aria-label="Tìm lịch sử"><label class="check-filter"><input type="checkbox" id="history-errors"> Chỉ lỗi / cần kiểm tra</label></div>
+<div class="history-summary"><span id="history-range"></span><span id="history-summary"></span></div>
+<div class="scroll"><table class="paired-table"><thead><tr><th>Ngày / Tài khoản</th><th>IN · Buổi sáng</th><th>OUT · Buổi chiều</th><th>Lần thử</th><th></th></tr></thead><tbody id="historyrows"></tbody></table></div></div>
+</section>
 <section id="settings" class="panel editor" hidden>
 <div class="editorbar"><h2>Cài đặt</h2><button id="load-editor">Tải lại dữ liệu</button></div>
 <p>Thay đổi được đọc lại khi service chạy; giờ ngẫu nhiên đã chọn hôm nay vẫn được giữ. Lưu từng nhóm riêng.</p>
@@ -64,13 +121,20 @@ dialog::backdrop{background:#102b4560}pre{white-space:pre-wrap;overflow-wrap:any
 <h3>Tài khoản</h3><p id="protection-note">Mật khẩu không được hiển thị. Để trống để giữ mật khẩu hiện tại.</p>
 <div class="scroll"><table><thead><tr><th>User</th><th>Mật khẩu mới</th><th>Bật</th><th>Bảo vệ</th><th></th></tr></thead><tbody id="accountrows"></tbody></table></div>
 <div class="editorbar"><button id="add-account">Thêm tài khoản</button><button class="primary" id="save-accounts">Lưu &amp; bảo vệ mật khẩu</button></div>
-<h3>Ngày nghỉ</h3><label class="field">Ngày nghỉ chung (YYYY-MM-DD, mỗi dòng một ngày)<textarea id="global-holidays"></textarea></label>
-<label><input id="skip-weekends" type="checkbox"> Nghỉ thứ Bảy / Chủ nhật</label>
-<div class="scroll"><table><thead><tr><th>User</th><th>Ngày nghỉ riêng (mỗi dòng một ngày)</th></tr></thead><tbody id="holidayrows"></tbody></table></div>
-<button class="primary" id="save-holidays">Lưu ngày nghỉ</button>
 </section>
 
-<div class="notice"><div id="health">Kết nối: chưa kiểm tra</div><button id="check-network">Kiểm tra website / VPN</button><br>Chạy ngay áp dụng cho lượt IN hoặc OUT đang chọn, bỏ qua khung giờ và ngày nghỉ hôm nay. Lượt đang chạy không bị xếp lại. “Đã xác minh” chỉ xuất hiện khi phản hồi thành công khớp cấu hình. “Đã bấm” chưa xác nhận website đã ghi nhận; kiểm tra chấm công trước khi lặp lại lượt đã bấm hoặc chưa rõ kết quả.</div>
+<div class="notice" id="monitor-notice"><div id="health">Kết nối: chưa kiểm tra</div><button id="check-network">Kiểm tra website / VPN</button><br>Chạy ngay áp dụng cho lượt IN hoặc OUT đang chọn, bỏ qua khung giờ và ngày nghỉ hôm nay. Lượt đang chạy không bị xếp lại. “Đã xác minh” chỉ xuất hiện khi phản hồi thành công khớp cấu hình. “Đã bấm” chưa xác nhận website đã ghi nhận; kiểm tra chấm công trước khi lặp lại lượt đã bấm hoặc chưa rõ kết quả.</div>
 <footer class="small"><span id="policy">Tự cập nhật mỗi 3 giây</span><span id="updated">—</span></footer>
+
+<dialog id="leave-dialog"><div class="dialog-heading"><div><h2 id="leave-dialog-title">Đăng ký nghỉ</h2><p>Áp dụng cho cả lượt IN và OUT trong ngày đã chọn.</p></div><button id="leave-cancel" aria-label="Đóng">✕</button></div>
+<form id="leave-form"><div class="formgrid">
+<label class="field">Từ ngày<input type="date" id="leave-from" required></label><label class="field">Đến ngày<input type="date" id="leave-to" required></label>
+<label class="field wide">Áp dụng cho<select id="leave-scope"><option value="all">Tất cả tài khoản · Nghỉ chung</option><option value="users">Chọn tài khoản · Nghỉ riêng</option></select></label>
+<div class="wide" id="leave-user-picker" hidden><div class="picker-toolbar"><input id="leave-user-search" placeholder="Tìm tài khoản…" aria-label="Tìm tài khoản đăng ký nghỉ"><button type="button" id="leave-select-all">Chọn tất cả</button></div><div id="leave-user-options" class="user-options"></div></div>
+<label class="field wide">Ghi chú (không bắt buộc)<input id="leave-note" maxlength="300" placeholder="Ví dụ: nghỉ phép, nghỉ lễ, việc gia đình"></label></div>
+<div class="registration-preview" id="leave-preview"></div><p class="form-error" id="leave-error" role="alert"></p>
+<div class="dialog-actions"><button type="button" id="leave-back">Hủy</button><button class="primary" type="submit" id="leave-save">Lưu ngày nghỉ</button></div></form></dialog>
+<dialog id="attempts-dialog"><div class="dialog-heading"><div><h2 id="attempts-title"></h2><p id="attempts-subtitle"></p></div><button id="attempts-close" aria-label="Đóng">✕</button></div>
+<div class="paired-detail" id="attempts-summary"></div><div class="attempt-list" id="attempts-list"></div></dialog>
 <dialog id="logs"><h3 id="logtitle">Log</h3><pre id="logtext"></pre><button id="closeLogs">Đóng</button></dialog>
 </main><script src="/dashboard.js"></script></body></html>

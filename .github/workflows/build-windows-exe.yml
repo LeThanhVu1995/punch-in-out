@@ -85,3 +85,12 @@ jobs:
             dist/PunchService.exe
             dist/PunchService.exe.sha256
           retention-days: 30
+
+      - name: Upload dashboard UI previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Dashboard-UI-previews
+          path: build/qa/*.png
+          if-no-files-found: ignore
+          retention-days: 14

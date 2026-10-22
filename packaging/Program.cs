@@ -91,7 +91,7 @@ internal static class Program
                 var secret="fixture-dpapi-test";
                 if(CredentialProtection.Unprotect(CredentialProtection.Protect(secret))!=secret)throw new Exception("DPAPI roundtrip failed.");
                 var testFile=Path.GetTempFileName();try{CredentialProtection.LockFile(testFile);}finally{File.Delete(testFile);}
-                int result=Run(node,runtime,"--test","test/schedule.test.js","test/retry.test.js","test/dashboard.test.js","test/upgrades.test.js");
+                int result=Run(node,runtime,"--test","test/schedule.test.js","test/retry.test.js","test/dashboard.test.js","test/upgrades.test.js","test/ui-flow.test.js");
                 if(result!=0)return result;
                 return Run(node,runtime,"packaging/smoke.cjs");
             }

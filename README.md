@@ -143,3 +143,15 @@ The build includes only explicit code/templates, never real config/accounts/holi
 CI checks schedule/retry/dashboard/settings/history/connectivity/verification, DPAPI, browser UI,
 service install/start/upgrade/stop/uninstall and management from a relocated EXE.
 Production website/VPN behavior must still be verified on the target machine.
+
+## Easier leave registration and paired history
+The **Ngày nghỉ** tab has a monthly calendar, range-date form, multiple-account selection, notes
+and an editable registration list. Existing global/per-user date lists are displayed as ranges
+without changing the file on read. The first write stores registrations and rebuilds global/users,
+so the scheduler stays compatible. Editing/deleting overlapping registrations preserves dates still
+covered by another registration. Each registration is limited to 366 days. Stale edits are rejected.
+
+The **Lịch sử** tab has its own Hôm nay / Hôm qua / 7 ngày shortcuts, from/to inputs (max 31 days),
+account search, review-needed filter and one row per account/day with IN and OUT side by side.
+Each cell shows scheduled/actual start times and status. Open details for per-attempt times/reasons/logs.
+Manual retry is available for today only and still requires confirmation for ambiguous/completed clicks.

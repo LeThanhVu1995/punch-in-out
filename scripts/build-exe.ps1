@@ -13,6 +13,7 @@ Copy-Item packaging\smoke.cjs (Join-Path $stage "packaging")
 '[]' | Set-Content (Join-Path $stage "accounts.example.json") -Encoding ASCII
 '{"timezone":"Asia/Ho_Chi_Minh","skipWeekends":true,"global":[],"users":{}}' | Set-Content (Join-Path $stage "off_days.example.json") -Encoding ASCII
 Copy-Item (Get-Command node).Source (Join-Path $stage "node.exe")
+$env:PUNCH_QA_DIR = Join-Path (Get-Location) "build\qa"
 Push-Location $stage
 try {
   npm install --omit=dev --ignore-scripts
@@ -20,7 +21,7 @@ try {
   $env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $stage "browsers"
   npx playwright install chromium
   Check-Exit "Browser installation failed"
-  node --test test/schedule.test.js test/retry.test.js test/dashboard.test.js test/upgrades.test.js
+  node --test test/schedule.test.js test/retry.test.js test/dashboard.test.js test/upgrades.test.js test/ui-flow.test.js
   Check-Exit "Scheduler tests failed"
   node packaging/smoke.cjs
   Check-Exit "Browser smoke test failed"

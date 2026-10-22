@@ -44,7 +44,7 @@ function updateConfig(root,configPath,body){
 }
 function updateHolidays(root,configPath,body){
  const config=JSON.parse(fs.readFileSync(configPath,"utf8")),file=path.resolve(root,config.offDaysFile);
- checkRevision(file,body.revision);validateHolidays(body.holidays);atomic(file,body.holidays);return {saved:true};
+ checkRevision(file,body.revision);validateHolidays(body.holidays);const next={...body.holidays};delete next.registrations;atomic(file,next);return {saved:true};
 }
 function updateAccounts(root,configPath,body){
  const config=JSON.parse(fs.readFileSync(configPath,"utf8")),file=path.resolve(root,config.accountsFile);
