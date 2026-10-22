@@ -1,0 +1,102 @@
+name: Diagnose VPN connection
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/vpn-diagnostics.yml']
+permissions:
+  contents: read
+concurrency:
+  group: vpn-diagnostics
+  cancel-in-progress: false
+jobs:
+  diagnose:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check PPTP and attempt VPN once (no attendance)
+        shell: powershell
+        env:
+          VPN_SERVER: ${{ secrets.VPN_SERVER }}
+          VPN_USER: ${{ secrets.VPN_USER }}
+          VPN_PASSWORD: ${{ secrets.VPN_PASSWORD }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $profile = "CLV-DIAGNOSTIC"
+          $started = Get-Date
+          $status = 1
+          $lines = [System.Collections.Generic.List[string]]::new()
+          $lines.Add("## VPN diagnostic (no attendance executed)")
+          $lines.Add("UTC start: $([DateTime]::UtcNow.ToString('o'))")
+          try {
+            foreach ($key in @("VPN_SERVER","VPN_USER","VPN_PASSWORD")) {
+              if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($key))) {
+                throw "Required repository secret missing: $key"
+              }
+            }
+            if ($env:VPN_SERVER -match "://") {
+              throw "VPN_SERVER must be a VPN hostname/IP, not a URL with http/https."
+            }
+            $addresses = @([System.Net.Dns]::GetHostAddresses($env:VPN_SERVER))
+            Write-Host "VPN hostname resolved: $($addresses.Count) address(es)."
+            $lines.Add("DNS: resolved ($($addresses.Count) addresses; values not printed).")
+            $reachable = $false
+            foreach ($address in $addresses) {
+              if ($address.AddressFamily -ne [System.Net.Sockets.AddressFamily]::InterNetwork) { continue }
+              $tcp = [System.Net.Sockets.TcpClient]::new()
+              try {
+                $connect = $tcp.ConnectAsync($address,1723)
+                if ($connect.Wait(8000) -and $tcp.Connected) { $reachable = $true }
+              } catch { } finally { $tcp.Dispose() }
+              if ($reachable) { break }
+            }
+            Write-Host "PPTP TCP 1723 reachable: $reachable"
+            $lines.Add("TCP 1723 reachable: $reachable")
+            if (!$reachable) {
+              throw "TCP 1723 could not be reached from this runner. Check VPN endpoint, upstream firewall and server IP restrictions before attempting authentication."
+            }
+            Start-Service RasMan
+            Add-VpnConnection -Name $profile -ServerAddress $env:VPN_SERVER -TunnelType Pptp -AuthenticationMethod MSChapv2 -EncryptionLevel Required -SplitTunneling -Force | Out-Null
+            # One authentication attempt only; no password, server or raw RAS text is printed.
+            $rasOutput = & rasdial.exe $profile $env:VPN_USER $env:VPN_PASSWORD 2>&1
+            $rasCode = $LASTEXITCODE
+            $vpn = Get-VpnConnection -Name $profile
+            Write-Host "RAS exit code: $rasCode"
+            Write-Host "VPN status: $($vpn.ConnectionStatus)"
+            $lines.Add("RAS exit code: $rasCode")
+            $lines.Add("Connection status: $($vpn.ConnectionStatus)")
+            if ($rasCode -eq 0 -and $vpn.ConnectionStatus -eq "Connected") {
+              $status = 0
+              $lines.Add("PPTP connected successfully on this runner. Target routing/TLS and attendance were not tested.")
+            } elseif ($rasCode -eq 619) {
+              $lines.Add("TCP control connection was reachable, but the PPTP tunnel failed with 619.")
+              $lines.Add("This does not prove a single root cause. Compare VPN-server logs at the UTC time above for PPP/auth/policy rejection, and verify GRE protocol 47 across NAT/firewalls.")
+              $lines.Add("If GRE is blocked outside the runner, YAML/client registry changes cannot repair that network path. A different protocol requires server support and its real connection settings.")
+            } elseif ($rasCode -eq 691) {
+              $lines.Add("Authentication or server access policy rejected the connection. Verify credentials/account/domain and server logs; do not repeatedly retry.")
+            } else {
+              $lines.Add("Review this RAS code with the VPN administrator and compare with a working Windows client's protocol, authentication and encryption settings.")
+            }
+          } catch {
+            # Custom diagnostics and generic exception TYPE only: do not dump credential-bearing native output.
+            if ($_.Exception.Message -match "^(Required repository secret missing:|VPN_SERVER must|TCP 1723 could)") {
+              Write-Host $_.Exception.Message
+              $lines.Add($_.Exception.Message)
+            } else {
+              Write-Host "Diagnostic setup failed: $($_.Exception.GetType().Name)"
+              $lines.Add("Diagnostic setup failed: $($_.Exception.GetType().Name)")
+            }
+          } finally {
+            & rasdial.exe $profile /disconnect 2>&1 | Out-Null
+            Remove-VpnConnection -Name $profile -Force -ErrorAction SilentlyContinue
+            try {
+              $events = @(Get-WinEvent -FilterHashtable @{LogName="Application";ProviderName="RasClient";StartTime=$started} -ErrorAction Stop)
+              foreach ($event in ($events | Select-Object -First 5)) {
+                $codes = @([regex]::Matches($event.Message,'(?i)(?:error|code)[^0-9]{0,25}([0-9]{3,5})') | ForEach-Object { $_.Groups[1].Value }) -join ","
+                Write-Host "RAS event ID=$($event.Id); code=$codes"
+                $lines.Add("RasClient event ID=$($event.Id); code=$codes")
+              }
+            } catch { $lines.Add("No readable RasClient Application events available.") }
+            $lines | Add-Content $env:GITHUB_STEP_SUMMARY
+          }
+          exit $status
