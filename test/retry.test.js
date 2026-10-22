@@ -69,13 +69,18 @@ test("worker retries failing account independently, persists evidence and recove
     state[JSON.stringify([date,username,mode])]={date,username,mode,due:0,status:mode==="IN"?"pending":"clicked"};
   const stateFile=path.join(folder,"data/state.json");
   fs.writeFileSync(stateFile,JSON.stringify(state));
-  let child;
-  function start(){child=spawn(process.execPath,[path.join(folder,"service/worker.js")],{stdio:"ignore"});}
+  let child, workerOutput="";
+  function start(){
+    workerOutput="";
+    child=spawn(process.execPath,[path.join(folder,"service/worker.js")],{stdio:["ignore","pipe","pipe"]});
+    child.stdout.on("data",data=>{workerOutput+=data;});
+    child.stderr.on("data",data=>{workerOutput+=data;});
+  }
   async function waitFor(predicate){
     for(let n=0;n<100;n++){
       const current=JSON.parse(fs.readFileSync(stateFile,"utf8"));
       if(predicate(current))return current;
-      if(child.exitCode!==null)throw new Error("worker stopped unexpectedly");
+      if(child.exitCode!==null)throw new Error("worker stopped unexpectedly: "+workerOutput);
       await new Promise(r=>setTimeout(r,100));
     }
     throw new Error("worker did not reach expected state");
