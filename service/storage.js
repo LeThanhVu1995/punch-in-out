@@ -17,7 +17,7 @@ function stateWriter(file){
 }
 function purgeDiagnostics(root){
  const path=require("path");
- for(const relative of ["data/history.jsonl","data/runs"]){
+ for(const relative of ["data/history.jsonl","data/manual-actions.jsonl","data/runs"]){
   fs.rmSync(path.join(root,relative),{recursive:true,force:true});
  }
 }

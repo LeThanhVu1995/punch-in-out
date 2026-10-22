@@ -53,7 +53,7 @@ test("dashboard exposes no credentials, rejects cross-origin commands, redacts l
  const root=fs.mkdtempSync(path.join(os.tmpdir(),"punch-dashboard-"));
  fs.mkdirSync(path.join(root,"data"));
  const port=await freePort(),state={};
- const service=await startDashboard({root,state,save(){},settings:()=>({config:{...config,dashboard:{port}},accounts}),stopping:()=>false,wake(){}});
+ const service=await startDashboard({root,state,save(){},settings:()=>({config:{...config,diagnostics:{enabled:true},dashboard:{port}},accounts}),stopping:()=>false,wake(){}});
  const url="http://127.0.0.1:"+port;
  try{
   const response=await fetch(url+"/api/status"),status=await response.json();
@@ -119,4 +119,31 @@ test("live worker handles dashboard manual command without live browser or dupli
   if(child.exitCode===null){const exited=once(child,"exit");child.kill();await exited;}
   fs.rmSync(root,{recursive:true,force:true});
  }
+});
+
+test("LAN binding requires login and protects assets, reads and commands",async()=>{
+ const crypto=require("crypto"),{dashboardAccess}=require("../service/dashboard-auth");
+ assert.throws(()=>dashboardAccess({host:"0.0.0.0"},17840),/login/);
+ assert.throws(()=>dashboardAccess({host:"0.0.0.0",auth:{}},17840),/Invalid/);
+ const salt=crypto.randomBytes(16).toString("hex"),password="fixture-lan-pass";
+ const auth={username:"admin",salt,iterations:210000,passwordHash:crypto.pbkdf2Sync(password,Buffer.from(salt,"hex"),210000,32,"sha256").toString("hex")};
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),"punch-lan-"));fs.mkdirSync(path.join(root,"data"));
+ const port=await freePort(),state={},service=await startDashboard({root,state,save(){},settings:()=>({config:{...config,dashboard:{host:"0.0.0.0",port,auth}},accounts}),stopping:()=>false,wake(){}});
+ const url="http://127.0.0.1:"+port,authorization="Basic "+Buffer.from("admin:"+password).toString("base64");
+ try{
+  assert.equal(service.address().address,"0.0.0.0");
+  for(const endpoint of ["/","/dashboard.js","/api/status","/api/editor","/api/history","/api/leave","/api/log"])
+   assert.equal((await fetch(url+endpoint)).status,401);
+  assert.equal((await fetch(url+"/api/status",{headers:{Authorization:"Basic "+Buffer.from("admin:wrong").toString("base64")}})).status,401);
+  const response=await fetch(url+"/api/status",{headers:{Authorization:authorization}}),status=await response.json();
+  assert.equal(response.status,200);assert.ok(!JSON.stringify(status).includes(auth.passwordHash));
+  const body=JSON.stringify({requestId:"lan-request-fixture",scope:"all",mode:"OUT"});
+  const headers={Authorization:authorization,"Content-Type":"application/json","X-Punch-Token":status.token,Origin:"https://evil.test"};
+  assert.equal((await fetch(url+"/api/run",{method:"POST",headers,body})).status,403);
+  headers.Origin=url;
+  assert.equal((await fetch(url+"/api/run",{method:"POST",headers,body})).status,200);
+  assert.equal(fs.existsSync(path.join(root,"data/manual-actions.jsonl")),false);
+  for(let i=0;i<5;i++)assert.equal((await fetch(url,{headers:{Authorization:"Basic "+Buffer.from("admin:wrong").toString("base64")}})).status,401);
+  assert.equal((await fetch(url,{headers:{Authorization:authorization}})).status,429);
+ }finally{service.closeAllConnections();await new Promise(r=>service.close(r));fs.rmSync(root,{recursive:true,force:true});}
 });

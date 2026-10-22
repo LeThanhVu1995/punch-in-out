@@ -30,11 +30,11 @@ internal static class Program
             if(command=="credential-protect"){Console.Write(CredentialProtection.Protect(Console.In.ReadToEnd()));return 0;}
             if(command=="credential-unprotect"){Console.Write(CredentialProtection.Unprotect(Console.In.ReadToEnd()));return 0;}
             if(command=="credential-lock" && args.Length==2){CredentialProtection.LockFile(args[1]);return 0;}
-            var allowed=new[]{"install","upgrade","start","stop","restart","status","uninstall","run","self-test","init","help","protect-accounts","dashboard"};
+            var allowed=new[]{"install","upgrade","start","stop","restart","status","uninstall","run","self-test","init","help","protect-accounts","dashboard","dashboard-lan"};
             if(args.Length>1 || !allowed.Contains(command))throw new Exception("Unknown command; use help.");
             if(command=="help")
             {
-                Console.WriteLine("WFMicros.exe init|install|upgrade|start|stop|restart|status|uninstall|run|self-test|protect-accounts|dashboard");
+                Console.WriteLine("WFMicros.exe init|install|upgrade|start|stop|restart|status|uninstall|run|self-test|protect-accounts|dashboard|dashboard-lan");
                 Console.WriteLine("install automatically upgrades an existing service and keeps its Windows Log On account.");
                 return 0;
             }
@@ -53,6 +53,7 @@ internal static class Program
                 }
                 return 0;
             }
+            if(command=="dashboard-lan"){RequireAdmin();DashboardLan.Configure(home);return 0;}
             if(command=="dashboard")
             {
                 using var cfg=JsonDocument.Parse(File.ReadAllText(Path.Combine(home,"config.json")));

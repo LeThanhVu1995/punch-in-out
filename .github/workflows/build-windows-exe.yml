@@ -47,6 +47,12 @@ jobs:
           $day = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTime]::UtcNow, "SE Asia Standard Time").ToString("yyyy-MM-dd")
           @{timezone="Asia/Ho_Chi_Minh";skipWeekends=$true;global=@($day);users=@{}} | ConvertTo-Json -Depth 10 | Set-Content dist/off_days.json
           try {
+            "fixture-lan-password`nfixture-lan-password" | & $exe dashboard-lan
+            Check-Exit "LAN configuration failed"
+            $lanConfig = Get-Content dist/config.json -Raw | ConvertFrom-Json
+            if ($lanConfig.dashboard.host -ne "0.0.0.0" -or !$lanConfig.dashboard.auth.passwordHash) { throw "LAN authentication missing" }
+            if ((Get-Content dist/config.json -Raw).Contains("fixture-lan-password")) { throw "Dashboard plaintext password retained" }
+            $authHeaders = @{Authorization="Basic " + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("admin:fixture-lan-password"))}
             & $exe install
             Check-Exit "Install failed"
             if ((Get-Content dist/accounts.local.json -Raw).Contains("fixture-not-real")) { throw "Plaintext password retained" }
@@ -65,7 +71,7 @@ jobs:
             Check-Exit "Start failed"
             function Wait-Dashboard {
               for ($i=0; $i -lt 30; $i++) {
-                try { return Invoke-RestMethod http://127.0.0.1:17846/api/status } catch { Start-Sleep -Seconds 1 }
+                try { return Invoke-RestMethod http://127.0.0.1:17846/api/status -Headers $authHeaders } catch { Start-Sleep -Seconds 1 }
               }
               throw "Dashboard did not become available"
             }
@@ -88,6 +94,7 @@ jobs:
           } finally {
             & $exe uninstall
             Check-Exit "Uninstall failed"
+            Remove-NetFirewallRule -DisplayName "WFMicros Dashboard" -ErrorAction SilentlyContinue
           }
       - uses: actions/upload-artifact@v4
         with:

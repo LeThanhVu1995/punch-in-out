@@ -34,7 +34,8 @@
   "retryDelaySeconds": 60,
   "dashboard": {
     "enabled": true,
-    "port": 17840
+    "port": 17840,
+    "host": "127.0.0.1"
   },
   "preflight": {
     "enabled": true,

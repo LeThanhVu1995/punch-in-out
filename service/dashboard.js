@@ -3,13 +3,14 @@ const {localTime}=require("./schedule"),{enqueue}=require("./manual");
 const {leaveSnapshot,updateLeave}=require("./leave");
 const {historyReport}=require("./history-report");
 const {readHistory}=require("./history"),{checkConnectivity}=require("./connectivity");
+const {dashboardAccess}=require("./dashboard-auth");
 const {validDate,editorSnapshot,updateConfig,updateHolidays,updateAccounts}=require("./configuration");
 function startDashboard({root,configPath=path.join(root,"config.json"),state,save,settings,stopping,wake}) {
  const initial=settings().config;
  if(initial.dashboard?.enabled===false)return Promise.resolve(null);
  const port=initial.dashboard?.port ?? 17840;
  if(!Number.isInteger(port)||port<1||port>65535)throw new Error("Invalid dashboard port");
- const token=crypto.randomBytes(32).toString("hex"),hosts=new Set(["127.0.0.1:"+port,"localhost:"+port]);
+ const token=crypto.randomBytes(32).toString("hex"),access=dashboardAccess(initial.dashboard??{},port),hosts=access.hosts;
  const startedAt=new Date().toISOString();let connection=null;
  const assets={"/":"dashboard.html","/dashboard.js":"dashboard-client.js"};
  function redact(value,accounts){
@@ -49,7 +50,8 @@ function startDashboard({root,configPath=path.join(root,"config.json"),state,sav
  }
  const server=http.createServer(async(req,res)=>{
   try{
-   if(!hosts.has(req.headers.host))return send(res,403,{error:"Invalid host"});
+   if(!hosts.has(req.headers.host?.toLowerCase()))return send(res,403,{error:"Invalid host"});
+   if(!access.authorized(req,res))return;
    const url=new URL(req.url,"http://"+req.headers.host);
    if(req.method==="GET" && assets[url.pathname])return send(res,200,fs.readFileSync(path.join(__dirname,assets[url.pathname]),"utf8"),url.pathname.endsWith(".js")?"text/javascript":"text/html");
    if(req.method==="GET" && url.pathname==="/api/status")return send(res,200,snapshot(url));
@@ -87,7 +89,7 @@ function startDashboard({root,configPath=path.join(root,"config.json"),state,sav
     const {config,accounts}=settings();
     if(url.pathname==="/api/run"){
      const result=enqueue(config,accounts,state,body);save();
-     fs.appendFileSync(path.join(root,"data","manual-actions.jsonl"),JSON.stringify({at:new Date().toISOString(),requestId:body.requestId,scope:body.scope,username:body.scope==="user"?body.username:undefined,confirmRepeat:body.confirmRepeat===true,...result})+"\n");
+     if(config.diagnostics?.enabled===true)fs.appendFileSync(path.join(root,"data","manual-actions.jsonl"),JSON.stringify({at:new Date().toISOString(),requestId:body.requestId,scope:body.scope,username:body.scope==="user"?body.username:undefined,confirmRepeat:body.confirmRepeat===true,...result})+"\n");
      wake();return send(res,200,result);
     }
     if(url.pathname==="/api/check"){connection=await checkConnectivity(config);return send(res,200,connection);}
@@ -100,6 +102,6 @@ function startDashboard({root,configPath=path.join(root,"config.json"),state,sav
   }catch(error){send(res,error.status || 400,{error:error.message});}
  });
  server.requestTimeout=15000;
- return new Promise((resolve,reject)=>{server.once("error",reject);server.listen(port,"127.0.0.1",()=>{console.log("Dashboard: http://127.0.0.1:"+port);resolve(server);});});
+ return new Promise((resolve,reject)=>{server.once("error",reject);server.listen(port,access.host,()=>{console.log("Dashboard listening on configured address, port "+port);resolve(server);});});
 }
 module.exports={startDashboard};
